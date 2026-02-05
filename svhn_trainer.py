@@ -49,7 +49,7 @@ class Trainer(object):
             os.makedirs(self.config.save_dir)
 
         log_path = os.path.join(self.config.save_dir, '{}.FM+PT+ENT.{}.txt'.format(self.config.dataset, self.config.suffix))
-        self.logger = open(log_path, 'wb')
+        self.logger = open(log_path, 'w')
         self.logger.write(disp_str)
 
     def _get_vis_images(self, labels):
@@ -115,7 +115,8 @@ class Trainer(object):
 
         # Entropy loss via feature pull-away term
         nsample = gen_feat.size(0)
-        gen_feat_norm = gen_feat / gen_feat.norm(p=2, dim=1).expand_as(gen_feat)
+        # normalize feature vectors with keepdim for correct broadcasting
+        gen_feat_norm = gen_feat / (gen_feat.norm(p=2, dim=1, keepdim=True) + 1e-8)
         cosine = torch.mm(gen_feat_norm, gen_feat_norm.t())
         mask = Variable((torch.ones(cosine.size()) - torch.diag(torch.ones(nsample))).cuda())
         pt_loss = config.pt_weight * torch.sum((cosine * mask) ** 2) / (nsample * (nsample-1))
@@ -128,15 +129,15 @@ class Trainer(object):
         self.gen_optimizer.step()
 
         monitor_dict = OrderedDict([
-                       ('unl acc' , unl_acc.data[0]), 
-                       ('gen acc' , gen_acc.data[0]), 
-                       ('max unl acc' , max_unl_acc.data[0]), 
-                       ('max gen acc' , max_gen_acc.data[0]), 
-                       ('lab loss' , lab_loss.data[0]),
-                       ('unl loss' , unl_loss.data[0]),
-                       ('ent loss' , ent_loss.data[0]),
-                       ('fm loss' , fm_loss.data[0]),
-                       ('pt loss' , pt_loss.data[0])
+                       ('unl acc' , unl_acc.item()), 
+                       ('gen acc' , gen_acc.item()), 
+                       ('max unl acc' , max_unl_acc.item()), 
+                       ('max gen acc' , max_gen_acc.item()), 
+                       ('lab loss' , lab_loss.item()),
+                       ('unl loss' , unl_loss.item()),
+                       ('ent loss' , ent_loss.item()),
+                       ('fm loss' , fm_loss.item()),
+                       ('pt loss' , pt_loss.item())
                    ])
                 
         return monitor_dict
@@ -162,11 +163,11 @@ class Trainer(object):
 
             ##### Monitoring (eval mode)
             # true-fake accuracy
-            unl_acc += torch.mean(nn.functional.sigmoid(unl_logsumexp).gt(0.5).float()).data[0]
-            gen_acc += torch.mean(nn.functional.sigmoid(gen_logsumexp).gt(0.5).float()).data[0]
+            unl_acc += torch.mean(nn.functional.sigmoid(unl_logsumexp).gt(0.5).float()).item()
+            gen_acc += torch.mean(nn.functional.sigmoid(gen_logsumexp).gt(0.5).float()).item()
             # top-1 logit compared to 0: to verify Assumption (2) and (3)
-            max_unl_acc += torch.mean(unl_logits.max(1)[0].gt(0.0).float()).data[0]
-            max_gen_acc += torch.mean(gen_logits.max(1)[0].gt(0.0).float()).data[0]
+            max_unl_acc += torch.mean(unl_logits.max(1)[0].gt(0.0).float()).item()
+            max_gen_acc += torch.mean(gen_logits.max(1)[0].gt(0.0).float()).item()
 
             cnt += 1
             if max_batch is not None and i >= max_batch - 1: break
@@ -182,9 +183,9 @@ class Trainer(object):
             images = Variable(images.cuda(), volatile=True)
             labels = Variable(labels.cuda(), volatile=True)
             pred_prob = self.dis(images)
-            loss += self.d_criterion(pred_prob, labels).data[0]
+            loss += self.d_criterion(pred_prob, labels).item()
             cnt += 1
-            incorrect += torch.ne(torch.max(pred_prob, 1)[1], labels).data.sum()
+            incorrect += torch.ne(torch.max(pred_prob, 1)[1], labels).sum().item()
             if max_batch is not None and i >= max_batch - 1: break
         return loss / cnt, incorrect
 
@@ -198,7 +199,7 @@ class Trainer(object):
         gen_images = self.gen(noise)
 
         save_path = os.path.join(self.config.save_dir, '{}.FM+PT+Ent.{}.png'.format(self.config.dataset, self.config.suffix))
-        vutils.save_image(gen_images.data.cpu(), save_path, normalize=True, range=(-1,1), nrow=10)
+        vutils.save_image(gen_images.data.cpu(), save_path, normalize=True, value_range=(-1,1), nrow=10)
 
     def param_init(self):
         def func_gen(flag):
@@ -208,7 +209,7 @@ class Trainer(object):
             return func
 
         images = []
-        for i in range(500 / self.config.train_batch_size):
+        for i in range(500 // self.config.train_batch_size):
             lab_images, _ = self.labeled_loader.next()
             images.append(lab_images)
         images = torch.cat(images, 0)
@@ -235,7 +236,7 @@ class Trainer(object):
         while True:
 
             if iter % batch_per_epoch == 0:
-                epoch = iter / batch_per_epoch
+                epoch = iter // batch_per_epoch
                 if config.dataset != 'svhn' and epoch >= config.max_epochs:
                     break
                 epoch_ratio = float(epoch) / float(config.max_epochs)
@@ -246,7 +247,7 @@ class Trainer(object):
             iter_vals = self._train()
 
             for k, v in iter_vals.items():
-                if not monitor.has_key(k):
+                if k not in monitor:
                     monitor[k] = 0.
                 monitor[k] += v
 

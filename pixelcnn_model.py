@@ -133,7 +133,9 @@ class WN_Conv2d(nn.Conv2d):
             weight_scale = Variable(self.weight_scale)
         # normalize weight matrix and linear projection [out x in x h x w]
         # for each output dimension, normalize through (in, h, w) = (1, 2, 3) dims
-        norm_weight = self.weight * (weight_scale[:,None,None,None] / torch.sqrt((self.weight ** 2).sum(3).sum(2).sum(1) + 1e-6)).expand_as(self.weight)
+        denom = torch.sqrt((self.weight ** 2).sum(dim=(1,2,3), keepdim=True) + 1e-6)
+        scale = weight_scale.view(-1, 1, 1, 1) / denom
+        norm_weight = self.weight * scale
         if old_version:
             bias = self.bias
         else:
@@ -191,8 +193,14 @@ class WN_ConvTranspose2d(nn.ConvTranspose2d):
             weight_scale = Variable(self.weight_scale)
         # normalize weight matrix and linear projection [in x out x h x w]
         # for each output dimension, normalize through (in, h, w)  = (0, 2, 3) dims
-        norm_weight = self.weight * (weight_scale[None,:,None,None] / torch.sqrt((self.weight ** 2).sum(3).sum(2).sum(0) + 1e-6)).expand_as(self.weight)
-        output_padding = self._output_padding(input, output_size)
+        denom = torch.sqrt((self.weight ** 2).sum(dim=(0,2,3), keepdim=True) + 1e-6)
+        scale = weight_scale.view(1, -1, 1, 1) / denom
+        norm_weight = self.weight * scale
+        try:
+            output_padding = self._output_padding(input, output_size)
+        except TypeError:
+            # PyTorch changed the _output_padding signature in newer versions
+            output_padding = self._output_padding(input, output_size, self.stride, self.padding, self.kernel_size, 2)
         if old_version:
             bias = self.bias
         else:

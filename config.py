@@ -96,6 +96,48 @@ class cifar_config:
     max_epochs = 1200
     vi_weight = 1e-2
 
+class two_circles_config:
+    dataset = 'two_circles'
+    image_size = 2  # 2D points (x, y)
+    num_label = 2   # Two real classes (inner and outer circle)
+    num_classes = 3 # Total classes including fake (inner, outer, fake)
+
+    gen_emb_size = 20
+    noise_size = 20
+
+    dis_lr = 3e-3
+    enc_lr = 1e-3
+    gen_lr = 1e-3
+
+    eval_period = 2000
+    vis_period = 1000
+    plot_period = 500  # Generate detailed plots every N iterations
+
+    data_root = 'data'
+
+    size_labeled_data = 40  # 20 samples per class
+
+    train_batch_size = 32
+    train_batch_size_2 = 32
+    dev_batch_size = 100
+
+    seed = 13
+
+    feature_match = True
+    top_k = 5
+    top1_weight = 1.
+
+    supervised_only = False
+    ent_weight = 0.1
+    pt_weight = 0.5
+    
+    max_epochs = 5000
+    
+    # Two circles specific parameters
+    n_samples = 2000
+    noise_level = 0.05
+    factor = 0.5  # ratio of inner to outer circle radius
+
 class pixelcnn_config:
     dataset = 'mnist'
     image_wh = 28 if dataset == 'mnist' else 32

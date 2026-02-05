@@ -17,25 +17,29 @@ def numpy_to_variable(x):
 
 def log_sum_exp(logits, mask=None, inf=1e7):
     if mask is not None:
+        # ensure mask is same type/device
+        mask = mask.type_as(logits)
         logits = logits * mask - inf * (1.0 - mask)
-        max_logits = logits.max(1)[0]
-        return ((logits - max_logits.expand_as(logits)).exp() * mask).sum(1).log().squeeze() + max_logits.squeeze()
-    else:
-        max_logits = logits.max(1)[0]
-        return ((logits - max_logits.expand_as(logits)).exp()).sum(1).log().squeeze() + max_logits.squeeze()
+    # use keepdim to make broadcasting explicit and safe
+    max_logits = logits.max(dim=1, keepdim=True)[0]
+    lse = (logits - max_logits).exp()
+    if mask is not None:
+        lse = lse * mask
+    lse = lse.sum(dim=1, keepdim=True).log() + max_logits
+    return lse.squeeze(1)
 
 def log_sum_exp_0(logits):
     max_logits = logits.max()
     return (logits - max_logits.expand_as(logits)).exp().sum().log() + max_logits
 
 def entropy(logits):
-    probs = nn.functional.softmax(logits)
-    ent = (- probs * logits).sum(1).squeeze() + log_sum_exp(logits)
+    probs = nn.functional.softmax(logits, dim=1)
+    ent = (- probs * logits).sum(dim=1) + log_sum_exp(logits)
     return ent.mean()
 
 def SumCELoss(logits, mask):
     dis_all_true = Variable(torch.ones(logits.size(0), logits.size(1)).cuda())
-    log_sum_exp_all = log_sum_exp(logits, all_true)
+    log_sum_exp_all = log_sum_exp(logits, dis_all_true)
     log_sum_exp_mask = log_sum_exp(logits, mask)
     return (- log_sum_exp_mask + log_sum_exp_all).mean()
 
