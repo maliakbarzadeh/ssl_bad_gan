@@ -103,7 +103,7 @@ class two_circles_config:
     num_classes = 3 # Total classes including fake (inner, outer, fake)
 
     gen_emb_size = 20
-    noise_size = 20
+    noise_size = 50
 
     dis_lr = 3e-3
     enc_lr = 1e-3
@@ -111,15 +111,15 @@ class two_circles_config:
 
     eval_period = 2000
     vis_period = 1000
-    plot_period = 500  # Generate detailed plots every N iterations
+    plot_period = 2000  # Generate detailed plots every N iterations
 
     data_root = 'data'
 
-    size_labeled_data = 40  # 20 samples per class
+    size_labeled_data = 20  # 10 samples per class
 
-    train_batch_size = 32
-    train_batch_size_2 = 32
-    dev_batch_size = 100
+    train_batch_size = 500
+    train_batch_size_2 = 500
+    dev_batch_size = 10000
 
     seed = 13
 
@@ -131,10 +131,10 @@ class two_circles_config:
     ent_weight = 0.1
     pt_weight = 0.5
     
-    max_epochs = 5000
+    max_epochs = 20000
     
     # Two circles specific parameters
-    n_samples = 2000
+    n_samples = 20000
     noise_level = 0.05
     factor = 0.5  # ratio of inner to outer circle radius
 

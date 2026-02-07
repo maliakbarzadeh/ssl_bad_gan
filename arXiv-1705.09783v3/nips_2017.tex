@@ -1,0 +1,110 @@
+\documentclass{article}
+
+% if you need to pass options to natbib, use, e.g.:
+% \PassOptionsToPackage{numbers, compress}{natbib}
+% before loading nips_2017
+%\dfrac{num}{den}
+% to avoid loading the natbib package, add option nonatbib:
+% \usepackage[nonatbib]{nips_2017}
+
+% \usepackage{nips_2017}
+
+% to compile a camera-ready version, add the [final] option, e.g.:
+\usepackage[final]{nips_2017}
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage{hyperref}       % hyperlinks
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}      % microtypography
+\usepackage{enumitem}
+\usepackage{amsmath, amsthm, amssymb}
+\usepackage{subcaption}
+
+\newtheorem{prop}{Proposition}
+\newtheorem{assum}{Assumption}
+\newtheorem{lemma}{Lemma}
+\newtheorem{cor}{Corollary}
+\newtheorem{defi}{Definition}
+
+
+\usepackage{graphicx} % more modern
+%\usepackage{epsfig} % less modern
+% \usepackage{subfigure} 
+
+\title{Good Semi-supervised Learning \\That Requires a Bad GAN}
+
+% The \author macro works with any number of authors. There are two
+% commands used to separate the names and addresses of multiple
+% authors: \And and \AND.
+%
+% Using \And between authors leaves it to LaTeX to determine where to
+% break the lines. Using \AND forces a line break at that point. So,
+% if LaTeX puts 3 of 4 authors names on the first line, and the last
+% on the second line, try using \AND instead of \And before the third
+% author name.
+
+\newcommand*\samethanks[1][\value{footnote}]{\footnotemark[#1]}
+
+\author{
+  Zihang Dai\thanks{Equal contribution. Ordering determined by dice rolling.}~,  Zhilin Yang\samethanks~, Fan Yang, William W. Cohen, Ruslan Salakhutdinov \\
+ School of Computer Science\\
+  Carnegie Melon University\\
+  % Pittsburgh, PA 15213 \\
+  \texttt{dzihang,zhiliny,fanyang1,wcohen,rsalakhu@cs.cmu.edu} \\
+  %% examples of more authors
+  %% \And
+  %% Coauthor \\
+  %% Affiliation \\
+  %% Address \\
+  %% \texttt{email} \\
+  %% \AND
+  %% Coauthor \\
+  %% Affiliation \\
+  %% Address \\ 
+  %% \texttt{email} \\
+  %% \And
+  %% Coauthor \\
+  %% Affiliation \\
+  %% Address \\
+  %% \texttt{email} \\
+  %% \And
+  %% Coauthor \\
+  %% Affiliation \\
+  %% Address \\
+  %% \texttt{email} \\
+}
+
+\begin{document}
+% \nipsfinalcopy is no longer used
+
+\maketitle
+
+\begin{abstract}
+Semi-supervised learning methods based on generative adversarial networks (GANs) obtained strong empirical results, but it is not clear 1) how the discriminator benefits from joint training with a generator, and 2) why good semi-supervised classification performance and a good generator cannot be obtained at the same time. Theoretically we show that given the discriminator objective, good semi-supervised learning indeed requires a bad generator, and propose the definition of a preferred generator. Empirically, we derive a novel formulation based on our analysis that substantially improves over feature matching GANs, obtaining state-of-the-art results on multiple benchmark datasets\footnote{Code is available at \url{https://github.com/kimiyoung/ssl_bad_gan}.}.
+\end{abstract}
+
+\input{intro}
+\input{related}
+\input{theory}
+\input{fm}
+\input{model}
+\input{exp}
+\input{conclusion}
+
+\section*{Acknowledgement}
+This work was supported by the DARPA award D17AP00001, the Google focused award, and the Nvidia NVAIL award.
+The authors would also like to thank Han Zhao for his insightful feedback.
+
+% \FloatBarrier
+\bibliography{refs}
+\bibliographystyle{plain}
+%\bibliographystyle{plainnat}
+
+\newpage
+
+\input{appendix}
+
+\end{document}

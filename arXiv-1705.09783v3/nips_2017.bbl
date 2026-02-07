@@ -1,0 +1,174 @@
+\begin{thebibliography}{26}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Arjovsky and Bottou(2017)]{arjovsky2017towards}
+Martin Arjovsky and L{\'e}on Bottou.
+\newblock Towards principled methods for training generative adversarial
+  networks.
+\newblock In \emph{NIPS 2016 Workshop on Adversarial Training. In review for
+  ICLR}, volume 2016, 2017.
+
+\bibitem[Belkin et~al.(2006)Belkin, Niyogi, and Sindhwani]{belkin2006manifold}
+Mikhail Belkin, Partha Niyogi, and Vikas Sindhwani.
+\newblock Manifold regularization: A geometric framework for learning from
+  labeled and unlabeled examples.
+\newblock \emph{Journal of machine learning research}, 7\penalty0
+  (Nov):\penalty0 2399--2434, 2006.
+
+\bibitem[Dai et~al.(2017)Dai, Almahairi, Bachman, Hovy, and
+  Courville]{dai2017calibrating}
+Zihang Dai, Amjad Almahairi, Philip Bachman, Eduard Hovy, and Aaron Courville.
+\newblock Calibrating energy-based generative adversarial networks.
+\newblock \emph{arXiv preprint arXiv:1702.01691}, 2017.
+
+\bibitem[Donahue et~al.(2016)Donahue, Kr{\"a}henb{\"u}hl, and
+  Darrell]{donahue2016adversarial}
+Jeff Donahue, Philipp Kr{\"a}henb{\"u}hl, and Trevor Darrell.
+\newblock Adversarial feature learning.
+\newblock \emph{arXiv preprint arXiv:1605.09782}, 2016.
+
+\bibitem[Dumoulin et~al.(2016)Dumoulin, Belghazi, Poole, Lamb, Arjovsky,
+  Mastropietro, and Courville]{dumoulin2016adversarially}
+Vincent Dumoulin, Ishmael Belghazi, Ben Poole, Alex Lamb, Martin Arjovsky,
+  Olivier Mastropietro, and Aaron Courville.
+\newblock Adversarially learned inference.
+\newblock \emph{arXiv preprint arXiv:1606.00704}, 2016.
+
+\bibitem[Goodfellow et~al.(2014)Goodfellow, Pouget-Abadie, Mirza, Xu,
+  Warde-Farley, Ozair, Courville, and Bengio]{goodfellow2014generative}
+Ian Goodfellow, Jean Pouget-Abadie, Mehdi Mirza, Bing Xu, David Warde-Farley,
+  Sherjil Ozair, Aaron Courville, and Yoshua Bengio.
+\newblock Generative adversarial nets.
+\newblock In \emph{Advances in neural information processing systems}, pages
+  2672--2680, 2014.
+
+\bibitem[Kingma et~al.(2014)Kingma, Mohamed, Rezende, and
+  Welling]{kingma2014semi}
+Diederik~P Kingma, Shakir Mohamed, Danilo~Jimenez Rezende, and Max Welling.
+\newblock Semi-supervised learning with deep generative models.
+\newblock In \emph{Advances in Neural Information Processing Systems}, pages
+  3581--3589, 2014.
+
+\bibitem[Kipf and Welling(2016)]{kipf2016semi}
+Thomas~N Kipf and Max Welling.
+\newblock Semi-supervised classification with graph convolutional networks.
+\newblock \emph{arXiv preprint arXiv:1609.02907}, 2016.
+
+\bibitem[Laine and Aila(2016)]{laine2016temporal}
+Samuli Laine and Timo Aila.
+\newblock Temporal ensembling for semi-supervised learning.
+\newblock \emph{arXiv preprint arXiv:1610.02242}, 2016.
+
+\bibitem[LeCun et~al.(1998)LeCun, Bottou, Bengio, and
+  Haffner]{lecun1998gradient}
+Yann LeCun, L{\'e}on Bottou, Yoshua Bengio, and Patrick Haffner.
+\newblock Gradient-based learning applied to document recognition.
+\newblock \emph{Proceedings of the IEEE}, 86\penalty0 (11):\penalty0
+  2278--2324, 1998.
+
+\bibitem[Li et~al.(2017)Li, Xu, Zhu, and Zhang]{li2017triple}
+Chongxuan Li, Kun Xu, Jun Zhu, and Bo~Zhang.
+\newblock Triple generative adversarial nets.
+\newblock \emph{arXiv preprint arXiv:1703.02291}, 2017.
+
+\bibitem[Maal{\o}e et~al.(2016)Maal{\o}e, S{\o}nderby, S{\o}nderby, and
+  Winther]{maaloe2016auxiliary}
+Lars Maal{\o}e, Casper~Kaae S{\o}nderby, S{\o}ren~Kaae S{\o}nderby, and Ole
+  Winther.
+\newblock Auxiliary deep generative models.
+\newblock \emph{arXiv preprint arXiv:1602.05473}, 2016.
+
+\bibitem[Miyato et~al.(2015)Miyato, Maeda, Koyama, Nakae, and
+  Ishii]{miyato2015distributional}
+Takeru Miyato, Shin-ichi Maeda, Masanori Koyama, Ken Nakae, and Shin Ishii.
+\newblock Distributional smoothing with virtual adversarial training.
+\newblock \emph{arXiv preprint arXiv:1507.00677}, 2015.
+
+\bibitem[Miyato et~al.(2017)Miyato, Maeda, Koyama, and
+  Ishii]{miyato2017virtual}
+Takeru Miyato, Shin-ichi Maeda, Masanori Koyama, and Shin Ishii.
+\newblock Virtual adversarial training: a regularization method for supervised
+  and semi-supervised learning.
+\newblock \emph{arXiv preprint arXiv:1704.03976}, 2017.
+
+\bibitem[Rasmus et~al.(2015)Rasmus, Berglund, Honkala, Valpola, and
+  Raiko]{rasmus2015semi}
+Antti Rasmus, Mathias Berglund, Mikko Honkala, Harri Valpola, and Tapani Raiko.
+\newblock Semi-supervised learning with ladder networks.
+\newblock In \emph{Advances in Neural Information Processing Systems}, pages
+  3546--3554, 2015.
+
+\bibitem[Salimans et~al.(2016)Salimans, Goodfellow, Zaremba, Cheung, Radford,
+  and Chen]{salimans2016improved}
+Tim Salimans, Ian Goodfellow, Wojciech Zaremba, Vicki Cheung, Alec Radford, and
+  Xi~Chen.
+\newblock Improved techniques for training gans.
+\newblock In \emph{NIPS}, 2016.
+
+\bibitem[Salimans et~al.(2017)Salimans, Karpathy, Chen, and
+  Kingma]{salimans2017pixelcnn}
+Tim Salimans, Andrej Karpathy, Xi~Chen, and Diederik~P Kingma.
+\newblock Pixelcnn++: Improving the pixelcnn with discretized logistic mixture
+  likelihood and other modifications.
+\newblock \emph{arXiv preprint arXiv:1701.05517}, 2017.
+
+\bibitem[S{\o}nderby et~al.(2016)S{\o}nderby, Caballero, Theis, Shi, and
+  Husz{\'a}r]{sonderby2016amortised}
+Casper~Kaae S{\o}nderby, Jose Caballero, Lucas Theis, Wenzhe Shi, and Ferenc
+  Husz{\'a}r.
+\newblock Amortised map inference for image super-resolution.
+\newblock \emph{arXiv preprint arXiv:1610.04490}, 2016.
+
+\bibitem[Springenberg(2015)]{springenberg2015unsupervised}
+Jost~Tobias Springenberg.
+\newblock Unsupervised and semi-supervised learning with categorical generative
+  adversarial networks.
+\newblock \emph{arXiv preprint arXiv:1511.06390}, 2015.
+
+\bibitem[Tompson et~al.(2015)Tompson, Goroshin, Jain, LeCun, and
+  Bregler]{tompson2015efficient}
+Jonathan Tompson, Ross Goroshin, Arjun Jain, Yann LeCun, and Christoph Bregler.
+\newblock Efficient object localization using convolutional networks.
+\newblock In \emph{Proceedings of the IEEE Conference on Computer Vision and
+  Pattern Recognition}, pages 648--656, 2015.
+
+\bibitem[Ulyanov et~al.(2017)Ulyanov, Vedaldi, and
+  Lempitsky]{ulyanov2017adversarial}
+Dmitry Ulyanov, Andrea Vedaldi, and Victor Lempitsky.
+\newblock Adversarial generator-encoder networks.
+\newblock \emph{arXiv preprint arXiv:1704.02304}, 2017.
+
+\bibitem[Weston et~al.(2012)Weston, Ratle, Mobahi, and
+  Collobert]{weston2012deep}
+Jason Weston, Fr{\'e}d{\'e}ric Ratle, Hossein Mobahi, and Ronan Collobert.
+\newblock Deep learning via semi-supervised embedding.
+\newblock In \emph{Neural Networks: Tricks of the Trade}, pages 639--655.
+  Springer, 2012.
+
+\bibitem[Yang et~al.(2016)Yang, Cohen, and Salakhutdinov]{yang2016revisiting}
+Zhilin Yang, William~W Cohen, and Ruslan Salakhutdinov.
+\newblock Revisiting semi-supervised learning with graph embeddings.
+\newblock \emph{arXiv preprint arXiv:1603.08861}, 2016.
+
+\bibitem[Yang et~al.(2017)Yang, Hu, Salakhutdinov, and Cohen]{yang2017semi}
+Zhilin Yang, Junjie Hu, Ruslan Salakhutdinov, and William~W Cohen.
+\newblock Semi-supervised qa with generative domain-adaptive nets.
+\newblock \emph{arXiv preprint arXiv:1702.02206}, 2017.
+
+\bibitem[Zhao et~al.(2016)Zhao, Mathieu, and LeCun]{zhao2016energy}
+Junbo Zhao, Michael Mathieu, and Yann LeCun.
+\newblock Energy-based generative adversarial network.
+\newblock \emph{arXiv preprint arXiv:1609.03126}, 2016.
+
+\bibitem[Zhu et~al.(2003)Zhu, Ghahramani, and Lafferty]{zhu2003semi}
+Xiaojin Zhu, Zoubin Ghahramani, and John~D Lafferty.
+\newblock Semi-supervised learning using gaussian fields and harmonic
+  functions.
+\newblock In \emph{Proceedings of the 20th International conference on Machine
+  learning (ICML-03)}, pages 912--919, 2003.
+
+\end{thebibliography}

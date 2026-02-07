@@ -1,0 +1,165 @@
+
+\section{Theoretical Analysis}
+\label{sec:theory}
+
+Given a labeled set $\mathcal{L} = \{(x, y)\}$, let $\{1, 2, \cdots, K\}$ be the label space for classification. Let $D$ and $G$ denote the discriminator and generator, and $P_D$ and $p_G$ denote the corresponding distributions. Consider the discriminator objective function of GAN-based semi-supervised learning \citep{salimans2016improved}: 
+\begin{equation}
+\max_{D} \mathbb{E}_{x, y \sim \mathcal{L}} \log P_D(y | x, y \leq K) + \mathbb{E}_{x \sim p} \log P_D(y \leq K | x) + \mathbb{E}_{x \sim p_G} \log P_D(K + 1 | x),
+\label{eq:obj}
+\end{equation}
+where $p$ is the true data distribution. The probability distribution $P_D$ is over $K+1$ classes where the first $K$ classes are true classes and the $(K+1)$-th class is the fake class. The objective function consists of three terms. The first term is to maximize the log conditional probability for labeled data, which is the standard cost as in supervised learning setting. The second term is to maximize the log probability of the first $K$ classes for unlabeled data. The third term is to maximize the log probability of the $(K+1)$-th class for generated data. Note that the above objective function bears a similar merit to the original GAN formulation if we treat $P(K+1 | x)$ to be the probability of fake samples, while the only difference is that we split the probability of true samples into $K$ sub-classes.
+
+Let $f(x)$ be a nonlinear vector-valued function, and $w_k$ be the weight vector for class $k$. As a standard setting in previous work \citep{salimans2016improved,dumoulin2016adversarially}, the discriminator $D$ is defined as $P_D(k | x) = \frac{\exp (w_k^\top f(x)) }{\sum_{k'=1}^{K+1} \exp(w_{k'}^\top f(x)) }$.
+Since this is a form of over-parameterization, $w_{K + 1}$ is fixed as a zero vector \citep{salimans2016improved}.
+We next discuss the choices of different possible $G$'s.
+
+\subsection{Perfect Generator}
+
+Here, by perfect generator we mean that the generator distribution $p_G$ exactly matches the true data distribution $p$, i.e., $p_G = p$. We now show that when the generator is perfect, it does not improve the generalization over the supervised learning setting.
+
+% \begin{prop}
+% If $p_G = p$, the objective function for $D$ degenerates to the supervised learning setting, i.e.,
+% \[
+% \max_{D} \mathbb{E}_{x, y \sim \mathcal{L}} \log P_D(y | x, y \leq K)
+% \]
+% \end{prop}
+% \begin{proof}
+% Since $p_G = p$, the objective function to maximize can be written as
+% \begin{eqnarray*}
+% J_D = \mathbb{E}_{x, y \sim \mathcal{L}} \log P_D(y | x, y \leq K) + \mathbb{E}_{x \sim p} \left[\log P_D(K + 1 | x) + \log (1 - P_D(K + 1 | x)) \right] 
+% \end{eqnarray*}
+% % Note that the first term and the second term can be optimized separately without dependency.
+% Let $P_{D^*}$ be the optimal solution that maximizes $J_D$.
+% Note that the first term and the second term are decoupled in the optimal conditions.
+% Therefore we obtain a closed-form optimal $P_{D^*}(K + 1 | x) = \frac{1}{2}$, and the problem reduces to optimizing the first term (i.e., the supervised loss).
+% \end{proof}
+
+\begin{prop}
+If $p_G = p$, and $D$ has infinite capacity, then for any optimal solution $D = (w, f)$ of the following supervised objective,
+\begin{equation}
+\max_D \mathbb{E}_{x, y \sim \mathcal{L}} \log P_D(y | x, y \leq K),
+\label{eq:sup-obj}
+\end{equation}
+there exists $D^* = (w^*, f^*)$ such that $D^*$ maximizes Eq. (\ref{eq:obj}) and that for all $x$, $P_D(y | x, y \leq K) = P_{D^*}(y | x, y \leq K)$.
+\label{prop:perfect}
+\end{prop}
+
+% \begin{proof}
+% Given an optimal solution $D = (w, f)$ for the supervised objective, due to the infinite capacity of the discriminator, there exists $D^* = (w^*, f^*)$ such that for all $x$ and $k \leq K$,
+% \begin{equation}
+% \exp ( w^{*\top}_k f^*(x) ) = \frac{\exp ( w_k^\top f(x) ) }{\sum_{k'} \exp ( w_{k'}^\top f(x) )}
+% \label{eq:reparam}
+% \end{equation}
+% For all $x$,
+% \[
+% P_{D^*}(y | x, y \leq K) = \frac{\exp (w_k^{*\top} f^*(x) ) }{\sum_{k'} \exp ( w_{k'}^{*\top} f^*(x) ) } = \frac{\exp (w_k^\top f(x)) }{\sum_{k'} \exp (w_{k'}^\top f(x)) } = P_D(y | x, y \leq K)
+% \]
+% Let $L_D$ be the supervised objective in Eq. (\ref{eq:obj}). Since $p = p_G$, the objective in Eq. (\ref{eq:obj}) can be written as
+% \[
+% J_D = L_D + \mathbb{E}_{x \sim p} \left[\log P_D(K + 1 | x) + \log (1 - P_D(K + 1 | x)) \right]
+% \]
+% Given Eq. (\ref{eq:reparam}), we have
+% \[
+% P_{D^*}(K+1 | x) = \frac{1}{1 + \sum_k \exp w^{*\top}_k f^*(x)} = \frac{1}{2}
+% \]
+% Therefore, $D^*$ maximizes the second term of $J_D$. Because $D$ maximizes $L_D$, $D^*$ also maximizes $L_D$. It follows that $D^*$ maximizes $J_D$.
+% \end{proof}
+The proof is provided in the supplementary material. Proposition \ref{prop:perfect} states that for any optimal solution $D$ of the supervised objective, there exists an optimal solution $D^*$ of the $(K+1)$-class objective such that $D$ and $D^*$ share the same generalization error.
+In other words, using the $(K+1)$-class objective does not prevent the model from experiencing any arbitrarily high generalization error that it could suffer from under the supervised objective.
+Moreover, since all the optimal solutions are equivalent w.r.t. the $(K+1)$-class objective, it is the optimization algorithm that really decides which specific solution the model will reach, and thus what generalization performance it will achieve.
+This implies that when the generator is perfect, the $(K+1)$-class objective by itself is not able to improve the generalization performance.
+In fact, in many applications, an almost infinite amount of unlabeled data is available, so learning a perfect generator for purely sampling purposes should not be useful. In this case, our theory suggests that not only the generator does not help, but also unlabeled data is not effectively utilized when the generator is perfect.
+
+\subsection{Complement Generator} \label{sec:comp}
+
+The function $f$ maps data points in the input space to the feature space. Let $p_k(f)$ be the density of the data points of class $k$ in the feature space. Given a threshold $\epsilon_k$, let $F_k$ be a subset of the data support where $p_k(f) > \epsilon_k$, i.e., $F_k = \{f: p_k(f) > \epsilon_k\}$. We assume that given $\{\epsilon_k\}_{k=1}^K$, the $F_k$'s are disjoint with a margin. More formally, for any $f_j \in F_j$, $f_k \in F_k$, and $j \not= k$, we assume that there exists a real number $0 < \alpha < 1$ such that $\alpha f_j + (1 - \alpha) f_k \notin F_j \cup F_k$. 
+As long as the probability densities of different classes do not share any mode, i.e., $\forall i \neq j, \mathrm{argmax}_f  p_i(f) \cap  \mathrm{argmax}_f p_j(f) = \emptyset$, this assumption can always be satisfied by tuning the thresholds $\epsilon_k$'s. 
+With the assumption held, we will show that the model performance would be better if the thresholds could be set to smaller values (ideally zero). We also assume that each $F_k$ contains at least one labeled data point.
+
+Suppose $\cup_{k=1}^K F_k$ is bounded by a convex set $\mathcal{B}$. If the support $F_G$ of a generator $G$ in the feature space is a relative complement set in $\mathcal{B}$, i.e., $F_G = \mathcal{B} - \cup_{k=1}^K F_k$, we call $G$ a complement generator. The reason why we utilize a bounded $\mathcal{B}$ to define the complement is presented in the supplementary material. Note that the definition of complement generator implies that $G$ is a function of $f$. By treating $G$ as function of $f$, theoretically $D$ can optimize the original objective function in Eq. (\ref{eq:obj}).
+
+
+% Let $F_k$ be the support of the data points of class $k$ ($k \leq K$) in the feature space. If the support $F_G$ of a generator $G$ in the feature space is a complement set of $\cup_{k = 1}^K F_k$, we call $G$ a complement generator. Note that the definition of complement generator implies that $G$ is a function of $f$. By treating $G$ as a function of $f$, $D$ can still optimizes the original objective function in Eq. (\ref{eq:obj}). We assume that the feature space supports $F_k$'s are disjoint.
+
+Now we present the assumption on the convergence conditions of the discriminator. Let $\mathcal{U}$ and $\mathcal{G}$ be the sets of unlabeled data and generated data. 
+
+\begin{assum}
+\textbf{Convergence conditions.}
+When $D$ converges on a finite training set $\{\mathcal{L}, \mathcal{U}, \mathcal{G}\}$, $D$ learns a (strongly) correct decision boundary for all training data points. More specifically, (1) for any $(x, y) \in \mathcal{L}$, we have $w_y^\top f(x) > w_k^\top f(x)$ for any other class $k \not= y$; (2) for any $x \in \mathcal{G}$, we have $0 > \max_{k = 1}^K w_k^\top f(x)$; (3) for any $x \in \mathcal{U}$, we have $\max_{k = 1}^K w_k^\top f(x) > 0$.
+\label{assum:opt}
+\end{assum}
+
+In Assumption \ref{assum:opt}, conditions (1) and (2) assume classification correctness on labeled data and true-fake correctness on generated data respectively, which is directly induced by the objective function. Likewise, it is also reasonable to assume true-fake correctness on unlabeled data, i.e., $\log \sum_k \exp w_k^\top f(x) > 0$ for $x \in \mathcal{U}$. However, condition (3) goes beyond this and assumes $\max_k w_k^\top f(x) > 0$. We discuss this issue in detail in the supplementary material and argue that these assumptions are reasonable. Moreover, in Section \ref{sec:approach}, our approach addresses this issue explicitly by adding a conditional entropy term to the discriminator objective to enforce condition (3).
+
+% Given the objective function, these are mild assumptions only requiring $f$ to have enough capacity, which is standard in the GAN literature \citep{goodfellow2014generative}. Condition (3) assumes strong true-fake belief on unlabeled data
+
+% The interpretation and reasonableness of the above assumption is discussed in Section \ref{sec:reason}.
+
+\begin{lemma}
+Suppose for all $k$, the L2-norms of weights $w_k$ are bounded by $\|w_k\|_2 \leq C$. Suppose that there exists $\epsilon > 0$ such that for any $f_G \in F_G$, there exists $f'_G \in \mathcal{G}$ such that $\|f_G - f'_G\|_2 \leq \epsilon$. With the conditions in Assumption \ref{assum:opt}, for all $k \leq K$, we have $w_k^\top f_G < C \epsilon$.
+\label{lem:bound}
+\end{lemma}
+% \begin{proof}
+% Let $\Delta f = f_G - f'_G$, then we have $\|\Delta f\|_2 \leq \epsilon$. Because $w_k^\top f'_G < 0$ by assumption, it follows
+% \[
+% w_k^\top f_G = w_k^\top (f'_G + \Delta f) = w_k^\top f'_G + w_k^\top \Delta f < w_k^\top \Delta f \leq C \epsilon
+% \]
+% \end{proof}
+
+\begin{cor}
+When unlimited generated data samples are available, with the conditions in Lemma \ref{lem:bound}, we have $\lim_{|\mathcal{G}| \rightarrow \infty} w_k^\top f_G \leq 0$.
+\label{cor}
+\end{cor}
+
+See the supplementary material for the proof.
+
+\begin{prop}
+Given the conditions in Corollary \ref{cor}, for all class $k \leq K$, for all feature space points $f_k \in F_k$, we have $w_k^\top f_k > w_j^\top f_k$ for any $j \not= k$. 
+\label{prop:correct}
+\end{prop}
+\begin{proof}
+Without loss of generality, suppose $j = \arg \max_{j \not= k} w_j^\top f_k$. Now we prove it by contradiction. Suppose $w_k^\top f_k \leq w_j^\top f_k$.
+Since $F_k$'s are disjoint with a margin, $\mathcal{B}$ is a convex set and $F_G = \mathcal{B} - \cup_k F_k$, there exists $0 < \alpha < 1$ such that $f_G = \alpha f_k + (1 - \alpha) f_j$ with $f_G \in F_G$ and $f_j$ being the feature of a labeled data point in $F_j$. By Corollary \ref{cor}, it follows that $w_j^\top f_G \leq 0$. Thus, $w_j^\top f_G = \alpha w_j^\top f_k + (1 - \alpha) w_j^\top f_j \leq 0$.
+By Assumption \ref{assum:opt}, $w_j^\top f_k > 0$ and $w_j^\top f_j > 0$, leading to contradiction.
+It follows that $w_k^\top f_k > w_j^\top f_k$ for any $j \not= k$.
+\end{proof}
+
+Proposition \ref{prop:correct} guarantees that when $G$ is a complement generator, under mild assumptions, a near-optimal $D$ learns correct decision boundaries in each high-density subset $F_k$ (defined by $\epsilon_k$) of the data support in the feature space. Intuitively, the generator generates complement samples so the logits of the true classes are forced to be low in the complement. As a result, the discriminator obtains class boundaries in low-density areas. This builds a connection between our approach with manifold-based methods \citep{belkin2006manifold,zhu2003semi} which also leverage the low-density boundary assumption.
+
+With our theoretical analysis, we can now answer the questions raised in Section \ref{sec:intro}. First, the $(K+1)$-class formulation is effective because the generated complement samples encourage the discriminator to place the class boundaries in low-density areas (Proposition \ref{prop:correct}). Second, good semi-supervised learning indeed requires a bad generator because a perfect generator is not able to improve the generalization performance (Proposition \ref{prop:perfect}).
+
+% \begin{cor}
+% If for any $f_k \in F_k$, $f_j \in F_j$ and $j \not= k$, there exists $0 < \alpha < 1$ such that $f_G = \alpha f_k + (1 - \alpha) f_j \in F_G$, Proposition \ref{prop:correct} holds even without $G$ being a complement generator.
+% \label{cor:pairwise}
+% \end{cor}
+
+% Corollary \ref{cor:pairwise} guarantees that we only need to generate data on the boundary between any class pairs, to obtain optimal decision boundaries.
+
+% \subsubsection{The Reasonableness of Assumption \ref{assum:opt}} \label{sec:reason}
+
+% Here, we justify the proposed Assumption \ref{assum:opt}. 
+
+% \paragraph{Classification correctness on $\mathcal{L}$} For (1), it assumes the correctness of classifiction on labeled data $\mathcal{L}$. This only requires the transformation $f(x)$ to have high enough capacity, such that the \textit{limited amount} of labeled data points are linearly separable in the feature space. Under the setting of semi-supervised learning, where $|\mathcal{L}|$ is quite limited, this assumption is usually reasonable. 
+
+% \paragraph{True-Fake correctness on $\mathcal{G}$} For (2), it assumes that on generated data, the classifier can correctly distinguish between true and generated data. This can be seen by noticing that $w_{K + 1}^\top f = 0$, and the assumtion thus reduces to $w_{K + 1}^\top f(x) > \max_{k = 1}^K w_k^\top f(x)$. For this part to hold, again we essentially require a transformation $f(x)$ with high enough capacity to distinguish true and fake data, which is a standard assumption made in GAN literature.
+
+% \paragraph{Strong true-fake belief on $\mathcal{U}$} Finally, part (3) of the assumption is a little bit trickier than the other two.
+% \begin{itemize}
+% \item Firstly, note that (3) is related to the true-fake correctioness, because $\max_{k = 1}^K w_k^\top f(x) > 0 = w_{K+1}^\top f(x)$ is a \textit{sufficient} (but not necessary) condition for $x$ being classfied as a true data point. 
+% Instead, the actual necessary condition is that $\log \sum_{k=1}^{K} \exp(w_k^\top f(x)) \geq w_{K+1}^\top f(x) = 0$. 
+% Thus, it means the condition (3) might be violated. 
+
+% \item However, using the relationship $\log \sum_{k=1}^{K} \exp(w_k^\top f(x)) \leq \log K \max_{k = 1}^K \exp(w_k^\top f(x))$, 
+% to guarantee the necessary condition $\log \sum_{k=1}^{K} \exp(w_k^\top f(x)) \geq 0$, we must have
+% \begin{eqnarray*}
+% && \log K \max_{k = 1}^K \exp(w_k^\top f(x)) \geq 0 \\ 
+% &\implies& \max_{k = 1}^K w_k^\top f(x) \geq \log 1/K
+% \end{eqnarray*}
+% Hence, if the condition (3) is voilated, it means
+% \[\log 1/K \leq \max_{k = 1}^K w_k^\top f(x) \leq 0 \]
+% Note that this is a very small interval for the logit $w_k^\top f(x)$, whose possible range expands the entire real line $(-\infty, \infty)$.
+% Thus, the region where such violation happens should be limited in size, making the assumption reasonable in practice.
+
+% \item Moreover, even there exists a limited violation region, as long as part (1) and part (2) in Assumption \ref{assum:opt} hold, Proposition \ref{prop:correct} always hold for regions inside $\mathcal{U}$ where $\max_{k = 1}^K w_k^\top f(x) > 0$. This can be viewed as a further Corollary. 
+
+% \end{itemize} 

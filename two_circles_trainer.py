@@ -91,35 +91,44 @@ class Trainer(object):
         # Standard classification loss (only on real classes 0 to K-1)
         lab_loss = self.d_criterion(lab_logits[:, :config.num_label], lab_labels)
 
-        # Conditional entropy loss (only on real classes)
-        unl_probs = F.softmax(unl_logits[:, :config.num_label], dim=1)
-        unl_log_probs = F.log_softmax(unl_logits[:, :config.num_label], dim=1)
-        ent_loss = config.ent_weight * torch.mean(torch.sum(unl_probs * unl_log_probs, dim=1))
+        # Conditional entropy loss (only on K real classes)
+        ent_loss = config.ent_weight * entropy(unl_logits[:, :config.num_label])
 
-        # GAN loss: real data should not be classified as fake (class K)
-        # Fake data should be classified as fake (class K)
-        # Real loss: maximize probability of real classes (minimize prob of fake class)
-        unl_logsumexp = log_sum_exp(unl_logits[:, :config.num_label])  # Sum over real classes
-        true_loss = -torch.mean(unl_logsumexp) + torch.mean(F.softplus(unl_logsumexp))
+        # K+1 GAN loss formulation
+        # For unlabeled real data: maximize probability of being in one of K real classes
+        # p(y in {1..K} | x) = sum(exp(logits[:K])) / sum(exp(all_logits))
+        # We want to maximize this, i.e., minimize -log of it
+        # -log(p) = log_sum_exp(all) - log_sum_exp(real_K)
+        unl_logsumexp_real = log_sum_exp(unl_logits[:, :config.num_label])  # sum over K real classes
+        unl_logsumexp_all = log_sum_exp(unl_logits)  # sum over all K+1 classes
+        true_loss = torch.mean(-unl_logsumexp_real + unl_logsumexp_all)
         
-        # Fake loss: generated data should be classified as fake class
-        fake_class_idx = config.num_label  # Index of fake class (K)
-        fake_loss = F.cross_entropy(gen_logits, torch.full((gen_logits.size(0),), fake_class_idx, dtype=torch.long, device=self.device))
+        # For generated fake data: maximize probability of being in fake class K+1
+        # p(y=K+1 | x) = exp(logit_K+1) / sum(exp(all_logits))
+        # -log(p) = log_sum_exp(all) - logit_K+1
+        gen_logsumexp_all = log_sum_exp(gen_logits)
+        fake_loss = torch.mean(-gen_logits[:, config.num_label] + gen_logsumexp_all)
         
         unl_loss = true_loss + fake_loss
          
         d_loss = lab_loss + unl_loss + ent_loss
 
         ##### Monitoring (train mode)
-        # Accuracy: real data predicted as one of real classes (not fake)
+        # Unlabeled: predicted as one of K real classes (not fake)
         unl_pred = torch.argmax(unl_logits, dim=1)
-        unl_acc = torch.mean((unl_pred < config.num_label).float())  # Not predicted as fake
+        unl_acc = torch.mean((unl_pred < config.num_label).float())  # Not predicted as class K+1
         
-        # Fake data predicted as fake class
+        # Generated: predicted as fake class K+1
         gen_pred = torch.argmax(gen_logits, dim=1)
-        gen_acc = torch.mean((gen_pred == config.num_label).float())  # Predicted as fake
+        gen_acc = torch.mean((gen_pred == config.num_label).float())  # Predicted as class K+1
         
-        # Classification accuracy on labeled data
+        # Alternative metrics using probabilities
+        unl_probs_real = torch.exp(unl_logsumexp_real - unl_logsumexp_all)  # p(y in {1..K})
+        gen_probs_fake = torch.exp(gen_logits[:, config.num_label] - gen_logsumexp_all)  # p(y=K+1)
+        max_unl_acc = torch.mean(unl_probs_real.detach().gt(0.5).float())
+        max_gen_acc = torch.mean(gen_probs_fake.detach().gt(0.5).float())
+        
+        # Classification accuracy on labeled data (among K real classes)
         lab_pred = torch.argmax(lab_logits[:, :config.num_label], dim=1)
         lab_acc = torch.mean((lab_pred == lab_labels).float())
 
@@ -155,6 +164,8 @@ class Trainer(object):
                        ('lab acc' , lab_acc.item()),
                        ('unl acc' , unl_acc.item()), 
                        ('gen acc' , gen_acc.item()),
+                       ('max unl acc' , max_unl_acc.item()),
+                       ('max gen acc' , max_gen_acc.item()),
                        ('lab loss' , lab_loss.item()),
                        ('unl loss' , unl_loss.item()),
                        ('ent loss' , ent_loss.item()),
@@ -182,17 +193,22 @@ class Trainer(object):
                 gen_logits = self.dis.out_net(gen_feat)
 
                 ##### Monitoring (eval mode)
-                # Real data predicted as one of real classes (not fake)
+                # Unlabeled real: predicted as one of K real classes
                 unl_pred = torch.argmax(unl_logits, dim=1)
                 unl_acc += torch.mean((unl_pred < self.config.num_label).float()).item()
                 
-                # Fake data predicted as fake class
+                # Generated: predicted as fake class K+1
                 gen_pred = torch.argmax(gen_logits, dim=1)
                 gen_acc += torch.mean((gen_pred == self.config.num_label).float()).item()
                 
-                # Additional metrics
-                max_unl_acc += torch.mean((unl_pred < self.config.num_label).float()).item()
-                max_gen_acc += torch.mean((gen_pred == self.config.num_label).float()).item()
+                # Alternative metrics using probabilities
+                unl_logsumexp_real = log_sum_exp(unl_logits[:, :self.config.num_label])
+                unl_logsumexp_all = log_sum_exp(unl_logits)
+                gen_logsumexp_all = log_sum_exp(gen_logits)
+                unl_probs_real = torch.exp(unl_logsumexp_real - unl_logsumexp_all)
+                gen_probs_fake = torch.exp(gen_logits[:, self.config.num_label] - gen_logsumexp_all)
+                max_unl_acc += torch.mean(unl_probs_real.gt(0.5).float()).item()
+                max_gen_acc += torch.mean(gen_probs_fake.gt(0.5).float()).item()
 
                 cnt += 1
                 if max_batch is not None and i >= max_batch - 1: break
@@ -312,26 +328,35 @@ class Trainer(object):
         unlabeled_samples = np.concatenate(unlabeled_samples, axis=0)[:500]
         unlabeled_images_cat = np.concatenate(unlabeled_images_list, axis=0)[:500]
         
-        # Get predictions for unlabeled data
+        # Get predictions for unlabeled data using K+1 class probabilities
         unlabeled_images_tensor = torch.from_numpy(unlabeled_images_cat).to(self.device)
         with torch.no_grad():
             unlabeled_logits = self.dis(unlabeled_images_tensor)
+            # Predicted class (0, 1, or 2=fake)
             unlabeled_pred_classes = torch.argmax(unlabeled_logits, dim=1).cpu().numpy()
+            # For classification among K real classes (when not predicted as fake)
+            unlabeled_pred_real_classes = torch.argmax(unlabeled_logits[:, :self.config.num_label], dim=1).cpu().numpy()
         
-        # Separate unlabeled by predicted class (including fake)
-        unlabeled_pred_inner = unlabeled_samples[unlabeled_pred_classes == 0]
-        unlabeled_pred_outer = unlabeled_samples[unlabeled_pred_classes == 1]
-        unlabeled_pred_fake = unlabeled_samples[unlabeled_pred_classes == self.config.num_label]
+        # Separate unlabeled by predicted class
+        unlabeled_pred_fake = unlabeled_samples[unlabeled_pred_classes == self.config.num_label]  # Predicted as fake (wrong!)
+        unlabeled_not_fake_mask = unlabeled_pred_classes < self.config.num_label
+        unlabeled_pred_inner = unlabeled_samples[unlabeled_not_fake_mask & (unlabeled_pred_real_classes == 0)]
+        unlabeled_pred_outer = unlabeled_samples[unlabeled_not_fake_mask & (unlabeled_pred_real_classes == 1)]
         
-        # Get predictions for generated data
+        # Get predictions for generated data using K+1 class
         gen_images_tensor = torch.from_numpy(gen_samples).float().to(self.device)
         with torch.no_grad():
             gen_logits = self.dis(gen_images_tensor)
+            # Predicted class (0, 1, or 2=fake)
             gen_pred_classes = torch.argmax(gen_logits, dim=1).cpu().numpy()
+            # For classification among K real classes (when wrongly predicted as real)
+            gen_pred_real_classes = torch.argmax(gen_logits[:, :self.config.num_label], dim=1).cpu().numpy()
         
-        gen_pred_inner = gen_samples[gen_pred_classes == 0]
-        gen_pred_outer = gen_samples[gen_pred_classes == 1]
-        gen_pred_fake = gen_samples[gen_pred_classes == self.config.num_label]
+        # Separate generated: correctly predicted as fake vs wrongly predicted as real
+        gen_pred_fake_correct = gen_samples[gen_pred_classes == self.config.num_label]  # Correctly predicted as fake!
+        gen_wrongly_real_mask = gen_pred_classes < self.config.num_label
+        gen_pred_inner = gen_samples[gen_wrongly_real_mask & (gen_pred_real_classes == 0)]  # Wrong: predicted as inner
+        gen_pred_outer = gen_samples[gen_wrongly_real_mask & (gen_pred_real_classes == 1)]  # Wrong: predicted as outer
 
         # Create detailed visualization with 2 subplots
         fig, axes = plt.subplots(1, 2, figsize=(20, 9))
@@ -405,16 +430,20 @@ class Trainer(object):
         if len(gen_pred_outer) > 0:
             ax.scatter(gen_pred_outer[:, 0], gen_pred_outer[:, 1], 
                       alpha=0.5, s=15, c='darkorange', label='Generated (Pred: Outer - Wrong!)', edgecolors='none')
-        if len(gen_pred_fake) > 0:
-            ax.scatter(gen_pred_fake[:, 0], gen_pred_fake[:, 1], 
-                      alpha=0.7, s=20, c='lime', label='Generated (Pred: Fake - Correct!)', edgecolors='black', linewidth=0.3, marker='*')
+        if len(gen_pred_fake_correct) > 0:
+            ax.scatter(gen_pred_fake_correct[:, 0], gen_pred_fake_correct[:, 1], 
+                      alpha=0.7, s=20, c='lime', label='Generated (Pred: Fake/Class K+1 - Correct!)', edgecolors='black', linewidth=0.3, marker='*')
         
-        title_text = f'Discriminator Predictions (K+1 Classes) - Iteration {iter_num}\n'
-        title_text += f'Labeled Accuracy: {labeled_accuracy*100:.1f}%'
+        # Calculate metrics
+        fake_detection_rate = len(gen_pred_fake_correct) / len(gen_samples) * 100 if len(gen_samples) > 0 else 0
+        unlabeled_as_fake_rate = len(unlabeled_pred_fake) / len(unlabeled_samples) * 100 if len(unlabeled_samples) > 0 else 0
+        
+        title_text = f'Discriminator Predictions (K+1 Classes: Inner/Outer/Fake) - Iteration {iter_num}\n'
+        title_text += f'Labeled Acc: {labeled_accuracy*100:.1f}%'
         if len(labeled_images_list) > 0:
             title_text += f' ({int(labeled_accuracy * len(labeled_images_list))}/{len(labeled_images_list)})'
-        fake_detection_rate = len(gen_pred_fake) / len(gen_samples) * 100 if len(gen_samples) > 0 else 0
-        title_text += f' | Fake Detection: {fake_detection_rate:.1f}%'
+        title_text += f' | Unlabeled Acc: {100-unlabeled_as_fake_rate:.1f}% (real→real)'
+        title_text += f' | Fake Detection: {fake_detection_rate:.1f}% (fake→K+1)'
         
         ax.set_title(title_text, fontsize=14, fontweight='bold')
         ax.set_xlim(-1.5, 1.5)
