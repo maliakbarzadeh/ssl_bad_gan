@@ -38,6 +38,11 @@ To reproduce our results on CIFAR-10
 python cifar_trainer.py
 ```
 
+To reproduce our results on Two-Circle dataset
+```
+python two_circles_trainer.py
+```
+
 ## Results
 
 Here is a comparison of different models using standard architectures without ensembles (100 labels on MNIST, 1000 labels on SVHN, and 4000 labels on CIFAR):
