@@ -21,6 +21,7 @@ from collections import OrderedDict
 
 import numpy as np
 from utils import *
+from sklearn.neighbors import KernelDensity
 
 class Trainer(object):
 
@@ -47,6 +48,14 @@ class Trainer(object):
 
         self.dis = two_circles_model.Discriminative(config).to(self.device)
         self.gen = two_circles_model.Generator(noise_size=config.noise_size, output_size=config.image_size).to(self.device)
+        
+        # Initialize Encoder for VI-based entropy (if enabled)
+        self.enc = None
+        if config.use_vi_entropy:
+            self.enc = two_circles_model.Encoder(input_size=config.image_size, 
+                                                  noise_size=config.noise_size, 
+                                                  output_params=True).to(self.device)
+            self.enc_optimizer = optim.Adam(self.enc.parameters(), lr=config.gen_lr, betas=(0.0, 0.999))
 
         self.dis_optimizer = optim.Adam(self.dis.parameters(), lr=config.dis_lr, betas=(0.5, 0.999))
         self.gen_optimizer = optim.Adam(self.gen.parameters(), lr=config.gen_lr, betas=(0.0, 0.999))
@@ -59,6 +68,23 @@ class Trainer(object):
         self.log_path = os.path.join(self.config.save_dir, '{}.FM+PT+ENT.{}.txt'.format(self.config.dataset, self.config.suffix))
         self.logger = open(self.log_path, 'w')
         self.logger.write(disp_str)
+        
+        # Initialize density estimator for complement generator (if enabled)
+        self.density_model = None
+        if config.use_complement_generator:
+            print('Training KDE density model for complement generator...')
+            # Collect all real training data
+            all_real_data = []
+            for i, (images, _) in enumerate(self.unlabeled_loader.get_iter()):
+                all_real_data.append(images.numpy())
+                if i >= 50:  # Use subset for efficiency
+                    break
+            all_real_data = np.concatenate(all_real_data, axis=0)
+            
+            # Train KDE model
+            self.density_model = KernelDensity(kernel='gaussian', bandwidth=0.1)
+            self.density_model.fit(all_real_data)
+            print(f'KDE model trained on {len(all_real_data)} samples')
         
         # Redirect stdout to log file
         sys.stdout = self.logger
@@ -91,8 +117,25 @@ class Trainer(object):
         # Standard classification loss (only on real classes 0 to K-1)
         lab_loss = self.d_criterion(lab_logits[:, :config.num_label], lab_labels)
 
-        # Conditional entropy loss (only on K real classes)
+        # Conditional entropy loss (only on K real classes) - original
+        # This is H(y|x) = -sum p(y|x) log p(y|x) which should be MINIMIZED
+        # But entropy() function returns positive entropy, so we MINIMIZE it with positive weight
         ent_loss = config.ent_weight * entropy(unl_logits[:, :config.num_label])
+
+        # NEW: Conditional entropy term from Bad GAN paper (Eq. 8)
+        # Maximize sum_{k=1}^K p(k|x) log p(k|x) = Minimize conditional entropy
+        # This encourages the discriminator to be CONFIDENT on unlabeled data
+        # Enforces condition (3) in Assumption 1: max_k w_k^T f(x) > 0
+        cond_ent_loss = 0
+        if config.cond_ent_weight > 0:
+            # Compute p(k|x) for k in {1..K} on unlabeled data
+            unl_probs_k = F.softmax(unl_logits[:, :config.num_label], dim=1)
+            unl_log_probs_k = F.log_softmax(unl_logits[:, :config.num_label], dim=1)
+            # Conditional entropy: H(y|x, y<=K) = -sum p(k|x) log p(k|x)
+            # We want to MINIMIZE this (maximize confidence)
+            # So we ADD it with positive weight (minimizing entropy = maximizing confidence)
+            cond_ent_loss = config.cond_ent_weight * torch.mean(torch.sum(unl_probs_k * unl_log_probs_k, dim=1))
+            # Note: this is NEGATIVE entropy (already has negative sign), so adding it minimizes entropy
 
         # K+1 GAN loss formulation
         # For unlabeled real data: maximize probability of being in one of K real classes
@@ -111,7 +154,7 @@ class Trainer(object):
         
         unl_loss = true_loss + fake_loss
          
-        d_loss = lab_loss + unl_loss + ent_loss
+        d_loss = lab_loss + unl_loss + ent_loss + cond_ent_loss
 
         ##### Monitoring (train mode)
         # Unlabeled: predicted as one of K real classes (not fake)
@@ -140,25 +183,98 @@ class Trainer(object):
         noise = Variable(torch.Tensor(unl_images.size(0), config.noise_size).uniform_().to(self.device))
         gen_images = self.gen(noise)
 
-        # Feature matching loss
-        unl_feat = self.dis(unl_images, feat=True)
-        gen_feat = self.dis(gen_images, feat=True)
-        fm_loss = torch.mean(torch.abs(torch.mean(gen_feat, 0) - torch.mean(unl_feat, 0)))
+        # Feature matching loss (keep generator near data manifold)
+        g_loss = 0
+        fm_loss = 0
+        if config.feature_match and config.fm_weight > 0:
+            unl_feat = self.dis(unl_images, feat=True)
+            gen_feat = self.dis(gen_images, feat=True)
+            fm_loss = config.fm_weight * torch.mean(torch.abs(torch.mean(gen_feat, 0) - torch.mean(unl_feat, 0)))
+            g_loss = g_loss + fm_loss
+        
+        # L2 regularization: keep generated samples close to data distribution
+        # Penalize samples with large L2 norm (data is in ~[-1, 1] range)
+        l2_reg_loss = 0.1 * torch.mean(torch.sum(gen_images ** 2, dim=1))
+        g_loss = g_loss + l2_reg_loss
 
-        # Entropy loss via feature pull-away term
-        nsample = gen_feat.size(0)
-        # normalize feature vectors with keepdim for correct broadcasting
-        gen_feat_norm = gen_feat / (gen_feat.norm(p=2, dim=1, keepdim=True) + 1e-8)
-        cosine = torch.mm(gen_feat_norm, gen_feat_norm.t())
-        mask = Variable((torch.ones(cosine.size()) - torch.diag(torch.ones(nsample))).to(self.device))
-        pt_loss = config.pt_weight * torch.sum((cosine * mask) ** 2) / (nsample * (nsample-1))
+        # Pull-away term (increase diversity/entropy of generated features)
+        pt_loss = 0
+        if config.pt_weight > 0:
+            gen_feat = self.dis(gen_images, feat=True)
+            nsample = gen_feat.size(0)
+            # normalize feature vectors with keepdim for correct broadcasting
+            gen_feat_norm = gen_feat / (gen_feat.norm(p=2, dim=1, keepdim=True) + 1e-8)
+            cosine = torch.mm(gen_feat_norm, gen_feat_norm.t())
+            mask = Variable((torch.ones(cosine.size()) - torch.diag(torch.ones(nsample))).to(self.device))
+            pt_loss = config.pt_weight * torch.sum((cosine * mask) ** 2) / (nsample * (nsample-1))
+            g_loss = g_loss + pt_loss
+        
+        # Optional: Complement generator - density-based loss
+        # Using KDE to estimate p(x), then encourage generator to sample from low-density regions
+        density_loss = 0
+        if config.use_complement_generator and config.density_weight > 0 and self.density_model is not None:
+            # Estimate log probability (density) for generated samples
+            # log_density shape: (batch_size,)
+            with torch.no_grad():
+                gen_samples_np = gen_images.cpu().numpy()
+                log_density = self.density_model.score_samples(gen_samples_np)
+                log_density_tensor = torch.from_numpy(log_density).float().to(self.device)
+            
+            # We want LOW density samples (complement generator)
+            # Option 1: Minimize density directly → samples in low-density regions
+            # density_loss = -config.density_weight * torch.mean(log_density_tensor)
+            
+            # Option 2 (Better): Use hinge loss - penalize if density is TOO HIGH
+            # If log_density > threshold, penalize (push away from high density)
+            density_threshold = np.log(config.density_threshold)  # log(epsilon)
+            # Penalize samples with density higher than threshold
+            density_loss = config.density_weight * torch.mean(
+                F.relu(log_density_tensor - density_threshold)
+            )
+            g_loss = g_loss + density_loss
+        
+        # Optional: VI-based entropy maximization
+        # Using Encoder to maximize entropy in latent space → diversity in generated samples
+        vi_loss = 0
+        if config.use_vi_entropy and config.vi_weight > 0 and self.enc is not None:
+            # Encode generated samples: x → (mu, log_sigma)
+            mu, log_sigma = self.enc(gen_images)
+            
+            # Method 1: KL divergence from standard normal prior N(0,I)
+            # KL(q(z|x) || N(0,I)) = -0.5 * sum(1 + log_sigma^2 - mu^2 - sigma^2)
+            # We want HIGH entropy → MINIMIZE KL → samples diverse in latent space
+            kl_div = -0.5 * torch.sum(1 + 2 * log_sigma - mu.pow(2) - (2 * log_sigma).exp(), dim=1)
+            
+            # Method 2: Direct entropy maximization
+            # H(q(z|x)) = 0.5 * (1 + log(2*pi)) + log_sigma
+            # We want to MAXIMIZE entropy → add negative weight
+            entropy_z = torch.sum(log_sigma, dim=1) + 0.5 * mu.size(1) * (1 + np.log(2 * np.pi))
+            
+            # Use KL divergence (penalize being too far from prior)
+            # Lower KL = more diverse, higher entropy
+            vi_loss = config.vi_weight * torch.mean(kl_div)
+            
+            # Alternative: directly maximize entropy (uncomment if preferred)
+            # vi_loss = -config.vi_weight * torch.mean(entropy_z)
+            
+            g_loss = g_loss + vi_loss
+            
+            # Update encoder along with generator
+            self.enc_optimizer.zero_grad()
 
-        # Generator loss
-        g_loss = fm_loss + pt_loss
+        if g_loss == 0:
+            # Fallback: at least use feature matching
+            unl_feat = self.dis(unl_images, feat=True)
+            gen_feat = self.dis(gen_images, feat=True)
+            g_loss = torch.mean(torch.abs(torch.mean(gen_feat, 0) - torch.mean(unl_feat, 0)))
         
         self.gen_optimizer.zero_grad()
         g_loss.backward()
         self.gen_optimizer.step()
+        
+        # Update encoder if VI entropy is used
+        if config.use_vi_entropy and self.enc is not None:
+            self.enc_optimizer.step()
 
         monitor_dict = OrderedDict([
                        ('lab acc' , lab_acc.item()),
@@ -169,8 +285,12 @@ class Trainer(object):
                        ('lab loss' , lab_loss.item()),
                        ('unl loss' , unl_loss.item()),
                        ('ent loss' , ent_loss.item()),
-                       ('fm loss' , fm_loss.item()),
-                       ('pt loss' , pt_loss.item())
+                       ('cond_ent loss' , cond_ent_loss.item() if isinstance(cond_ent_loss, torch.Tensor) else cond_ent_loss),
+                       ('fm loss' , fm_loss.item() if isinstance(fm_loss, torch.Tensor) else fm_loss),
+                       ('pt loss' , pt_loss.item() if isinstance(pt_loss, torch.Tensor) else pt_loss),
+                       ('l2_reg loss' , l2_reg_loss.item() if isinstance(l2_reg_loss, torch.Tensor) else 0),
+                       ('density loss' , density_loss.item() if isinstance(density_loss, torch.Tensor) else density_loss),
+                       ('vi loss' , vi_loss.item() if isinstance(vi_loss, torch.Tensor) else vi_loss)
                    ])
                 
         return monitor_dict
@@ -487,6 +607,8 @@ class Trainer(object):
                 # use another outer max to prevent any float computation precision problem
                 self.dis_optimizer.param_groups[0]['lr'] = max(min_lr, config.dis_lr * min(3. * (1. - epoch_ratio), 1.))
                 self.gen_optimizer.param_groups[0]['lr'] = max(min_lr, config.gen_lr * min(3. * (1. - epoch_ratio), 1.))
+                if config.use_vi_entropy and self.enc is not None:
+                    self.enc_optimizer.param_groups[0]['lr'] = max(min_lr, config.gen_lr * min(3. * (1. - epoch_ratio), 1.))
 
             iter_vals = self._train()
 
