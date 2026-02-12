@@ -51,10 +51,10 @@ class Trainer(object):
             os.makedirs(self.config.save_dir)
 
         log_path = os.path.join(self.config.save_dir, '{}.FM+VI.{}.txt'.format(self.config.dataset, self.config.suffix))
-        self.logger = open(log_path, 'wb')
+        self.logger = open(log_path, 'w')
         self.logger.write(disp_str)
 
-        print self.dis
+        print(self.dis)
 
     def _get_vis_images(self, labels):
         labels = labels.data.cpu()
@@ -211,7 +211,7 @@ class Trainer(object):
             return func
 
         images = []
-        for i in range(500 / self.config.train_batch_size):
+        for i in range(500 // self.config.train_batch_size):
             lab_images, _ = self.labeled_loader.next()
             images.append(lab_images)
         images = torch.cat(images, 0)
@@ -242,7 +242,7 @@ class Trainer(object):
         while True:
 
             if iter % batch_per_epoch == 0:
-                epoch = iter / batch_per_epoch
+                epoch = iter // batch_per_epoch
                 epoch_ratio = float(epoch) / float(config.max_epochs)
                 # use another outer max to prevent any float computation precision problem
                 self.dis_optimizer.param_groups[0]['lr'] = max(min_lr, config.dis_lr * min(3. * (1. - epoch_ratio), 1.))
@@ -252,7 +252,7 @@ class Trainer(object):
             iter_vals = self._train()
 
             for k, v in iter_vals.items():
-                if not monitor.has_key(k):
+                if k not in monitor:
                     monitor[k] = 0.
                 monitor[k] += v
 

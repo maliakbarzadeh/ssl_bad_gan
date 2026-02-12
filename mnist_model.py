@@ -31,7 +31,7 @@ class BatchNorm1d(nn.Module):
         self.b = b
         self.g = g
         self.core = nn.BatchNorm1d(num_features, eps=eps, momentum=momentum, affine=(b and g))
-        print self.core
+        print(self.core)
         if (not b) and g:
             self.g = Parameter(torch.Tensor(num_features))
         elif (not g) and b:

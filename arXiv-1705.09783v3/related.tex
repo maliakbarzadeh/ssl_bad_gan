@@ -1,0 +1,35 @@
+
+\section{Related Work}
+Besides the adversarial feature matching approach~\citep{salimans2016improved}, several previous works have incorporated the idea of adversarial training in semi-supervised learning.
+Notably, \citep{springenberg2015unsupervised} proposes categorical generative adversarial networks (CatGAN), which substitutes the binary discriminator in standard GAN with a multi-class classifier, and trains both the generator and the discriminator using information theoretical criteria on unlabeled data. 
+% With labeled data as additional training signals, the cross-entropy cost can be thus posed upon the multi-class discriminator, leading to a valid classifier for the supervised task.
+From the perspective of regularization, \citep{miyato2015distributional,miyato2017virtual} propose virtual adversarial training (VAT), which effectively smooths the output distribution of the classifier by seeking virtually adversarial samples.
+% With additional entropy minimization principle, VAT achieves state-of-the-art performance on SVHN and CIFAR-10 for semi-supervised learning.
+It is worth noting that VAT bears a similar merit to our approach, which is to learn from auxiliary non-realistic samples rather than realistic data samples. Despite the similarity, the principles of VAT and our approach are orthogonal, where VAT aims to enforce a smooth function while we aim to leverage a generator to better detect the low-density boundaries.
+%Different from aforementioned approaches, \citep{yang2017semi} does not require the discriminator to distinguish the distributions from which the input comes. 
+%Instead, \citep{yang2017semi} proposes to train conditional generators with adversarial training to obtain complete sample pairs, which can be directly used as additional training cases.
+%Different from aforementioned approaches, \citep{yang2017semi} does not require the discriminator to distinguish the distributions from which the input comes. 
+%Instead, \citep{yang2017semi} proposes to train conditional generators with adversarial training to obtain complete sample pairs, which can be directly used as additional training cases.
+Different from aforementioned approaches, \citep{yang2017semi} proposes to train conditional generators with adversarial training to obtain complete sample pairs, which can be directly used as additional training cases.
+Recently, Triple GAN~\citep{li2017triple} also employs the idea of conditional generator, but uses adversarial cost to match the two model-defined factorizations of the joint distribution with the one defined by paired data.
+
+Apart from adversarial training, there has been other efforts in semi-supervised learning using deep generative models recently.
+As an early work, \citep{kingma2014semi} adapts the original Variational Auto-Encoder (VAE) to a semi-supervised learning setting by treating the classification label as an additional latent variable in the directed generative model.
+\citep{maaloe2016auxiliary} adds auxiliary variables to the deep VAE structure to make variational distribution more expressive.
+%Similarly, such auxiliary deep generative models (ADGM) can be directly used for semi-supervised learning, as in \citep{kingma2014semi}.
+%With the boosted model expressiveness, ADGM improves the semi-supervised learning performance upon the semi-supervised VAE.
+%Similarly, such auxiliary deep generative models (ADGM) can be directly used for semi-supervised learning, as in \citep{kingma2014semi}.
+With the boosted model expressiveness, auxiliary deep generative models (ADGM) improve the semi-supervised learning performance upon the semi-supervised VAE.
+Different from the explicit usage of deep generative models, the Ladder networks~\citep{rasmus2015semi} take advantage of the local (layerwise) denoising auto-encoding criterion, and create a more informative unsupervised signal through lateral connection.
+
+% Finally, our work is also related to domain adaptation, especially those utilizing adversarial training procedure~\citep{ganin2014unsupervised,ajakan2014domain,bousmalis2016domain,bousmalis2016unsupervised}.
+% Both \citep{ganin2014unsupervised} and \citep{ajakan2014domain} emploit the same idea of adding another domain classfier that shares the same feature as the task classifier to regularize/guide the learned feature space.
+% Though just an approximation, the DANN~\citep{ajakan2014domain} can be seen as directly optimizing the notion of $\mathcal{H}$-divergence~\citep{ben2007analysis}.
+% \citep{bousmalis2016domain} introduce a model that explicitly enforces the separation of components that are private or common to the source and target domains.
+% More recently, \citep{bousmalis2016unsupervised} propose to simultanously learn a tranformation from source samples to target samples, and train the classifier on the tranformed samples instead of the raw source samples.
+% As domain adaptation can be viewed as a case of semi-supervised learning, it often assumes completely no supervision in the target domain, which is in spirit quite different from the perspective of the proposed work.
+
+%More importantly, note that in our proposed scheme, the domain divergence comes from the inaccuracy of the trainable generator, while in standard domain adaptation, it roots in the intrinsic difference in the data distributions.
+%In another word, in the our framework, as the generator distribution gets closer to true data distribution, the domain divergence will gradually decrease or potentially disappear in the limit.
+
+%On the discriminative model side, borrowing ideas from domain adaptation \citep{johnson2016google}, additional domain tag (as input) are employed to parameterize a domain specific classification distribution.

@@ -1,0 +1,6 @@
+__pycache__/
+two_circles_log/
+two_circles_log_*/
+svhn_log/
+data/*.mat
+*.mat

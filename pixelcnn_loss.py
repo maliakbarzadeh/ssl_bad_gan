@@ -139,4 +139,4 @@ def log_prob_from_logits(logits):
 if __name__ == '__main__':
     x = Variable(torch.rand(10, 32, 32, 3))
     l = Variable(torch.rand(10, 32, 32, 100))
-    print discretized_mix_logistic_loss(x, l)
+    print(discretized_mix_logistic_loss(x, l))

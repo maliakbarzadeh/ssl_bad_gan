@@ -161,4 +161,4 @@ if __name__ == '__main__':
     x = Variable(torch.Tensor(10, 1, 28, 28).random_().cuda())
     t = m(x)
     assert_nan(t)
-    print t.size()
+    print(t.size())

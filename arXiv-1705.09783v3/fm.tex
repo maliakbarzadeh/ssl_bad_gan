@@ -1,0 +1,60 @@
+
+\section{Case Study on Synthetic Data}
+\label{sec:case_study}
+In the previous section, we have established the fact a complement generator, instead of a perfect generator, is what makes a good semi-supervised learning algorithm.
+Now, to get a more intuitive understanding, we conduct a case study based on two 2D synthetic datasets, where we can easily verify our theoretical analysis by visualizing the model behaviors. 
+In addition, by analyzing how feature matching (FM)~\citep{salimans2016improved} works in 2D space, we identify some potential problems of it, which motivates our approach to be introduced in the next section.
+Specifically, two synthetic datasets are four spins and two circles, as shown in Fig. \ref{fig:synthetic_data}.
+%To ensure that ourexperiments are representative, we make sure that (1) different classes should be not linearly separable, and (2) labeled data can only provide partial information. 
+\begin{figure}[!tb]
+	\centering
+	\minipage{0.5\textwidth}\centering
+		\includegraphics[width=0.49\linewidth]{FIG/four_spins.png}\hfill
+		\includegraphics[width=0.49\linewidth]{FIG/two_circles.png}
+		\caption{\label{fig:synthetic_data} \small Labeled and unlabeled data are denoted by cross and point respectively, and different colors indicate classes.}
+	\endminipage\hfill
+	\minipage{0.48\textwidth}\centering
+		\includegraphics[width=\linewidth]{FIG/four_spins-complement.png}
+		\caption{\label{fig:four_spins_complement} \small Left: Classification decision boundary, where the white line indicates true-fake boundary; Right: True-Fake decision boundary}
+	\endminipage\hfill
+	\minipage{0.235\textwidth}\centering
+	\includegraphics[width=\linewidth]{FIG/feature_space.png}
+	\caption{\small Feature space at convergence}
+	\label{fig:feature_space}
+	\endminipage\hfill
+	\minipage{0.72\textwidth}\centering
+	\includegraphics[width=\linewidth]{FIG/four_spins-fm.png}
+	\caption{\small Left: Blue points are generated data, and the black shadow indicates unlabeled data. Middle and right can be interpreted as above.}
+	\label{fig:four_spins_fm}
+	\endminipage
+\vspace{-1em}
+\end{figure}
+\paragraph{Soundness of complement generator} Firstly, to verify that the complement generator is a preferred choice, we construct the complement generator by uniformly sampling from the a bounded 2D box that contains all unlabeled data, and removing those on the manifold.  % retaining points that are at least a distance away from any unlabeled point.
+Based on the complement generator, the result on four spins is visualized in Fig. \ref{fig:four_spins_complement}.
+As expected, both the classification and true-fake decision boundaries are almost perfect. 
+More importantly, the classification decision boundary always lies in the fake data area (left panel), which well matches our theoretical analysis.
+\paragraph{Visualization of feature space} Next, to verify our analysis about the feature space, we choose the feature dimension to be 2, apply the FM to the simpler dataset of two circles, and visualize the feature space in Fig. \ref{fig:feature_space}.
+As we can see, most of the generated features (blue points) resides in between the features of two classes (green and orange crosses), although there exists some overlap.
+As a result, the discriminator can almost perfectly distinguish between true and generated samples as indicated by the black decision boundary, satisfying the our required Assumption \ref{assum:opt}.
+Meanwhile, the model obtains a perfect classification boundary (blue line) as our analysis suggests.
+\paragraph{Pros and cons of feature matching} Finally, to further understand the strength and weakness of FM, we analyze the solution FM reaches on four spins shown in Fig. \ref{fig:four_spins_fm}.
+From the left panel, we can see many of the generated samples actually fall into the data manifold, while the rest scatters around in the nearby surroundings of data manifold.
+It suggests that by matching the first-order moment by SGD, FM is performing some kind of distribution matching, though in a rather \textit{weak} manner.
+Loosely speaking, FM has the effect of generating samples close to the manifold.
+But due to its weak power in distribution matching, FM will inevitably generate samples outside of the manifold, especially when the data complexity increases.
+Consequently, the generator density $p_G$ is usually lower than the true data density $p$ within the manifold and higher outside.
+Hence, an optimal discriminator $P_{D^*}(K+1 \mid x) = p(x) / (p(x) + p_G(x))$ could still distinguish between true and generated samples in many cases.
+However, there are two types of mistakes the discriminator can still make
+\begin{enumerate}[leftmargin=*]
+	\item Higher density mistake inside manifold: 
+	Since the FM generator still assigns a significant amount of probability mass inside the support, wherever $p_G > p > 0$, an optimal discriminator will incorrectly predict samples in that region as ``fake''.
+	Actually, this problem has already shown up when we examine the feature space (Fig. \ref{fig:feature_space}).
+	
+	\item Collapsing with missing coverage outside manifold: 
+	As the feature matching objective for the generator only requires matching the first-order statistics, there exists many trivial solutions the generator can end up with. 
+	For example, it can simply collapse to mean of unlabeled features, or a few surrounding modes as along as the feature mean matches.
+	Actually, we do see such collapsing phenomenon in high-dimensional experiments when FM is used (see Fig. \ref{fig:fm-svhn} and Fig. \ref{fig:fm-cifar})
+	As a result, a collapsed generator will fail to cover some gap areas between manifolds. 
+	Since the discriminator is only well-defined on the union of the data supports of $p$ and $p_G$, the prediction result in such missing area is under-determined and fully relies on the smoothness of the parametric model. 
+	In this case, significant mistakes can also occur.
+\end{enumerate}

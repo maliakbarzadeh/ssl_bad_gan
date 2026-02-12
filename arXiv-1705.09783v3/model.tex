@@ -1,0 +1,290 @@
+
+\section{Approach} \label{sec:approach}
+
+% Now we present our approach for GAN-based semi-supervised learning. 
+As discussed in previous sections, feature matching GANs suffer from the following drawbacks:
+%\begin{itemize}[leftmargin=*]
+1) the first-order moment matching objective does not prevent the generator from collapsing (missing coverage);
+2) feature matching can generate high-density samples inside manifold;
+3) the discriminator objective does not encourage realization of condition (3) in Assumption \ref{assum:opt} as discussed in Section \ref{sec:comp}.
+%\end{itemize}
+Our approach aims to explicitly address the above drawbacks.
+
+Following prior work \citep{salimans2016improved,goodfellow2014generative}, we employ a GAN-like implicit generator. We first sample a latent variable $z$ from a uniform distribution $\mathcal{U}(0, 1)$ for each dimension, and then apply a deep convolutional network to transform $z$ to a sample $x$.
+
+\subsection{Generator Entropy} \label{sec:gen-ent}
+Fundamentally, the first drawback concerns the entropy of the distribution of generated features, $\mathcal{H}(p_G(f))$. This connection is rather intuitive, as the collapsing issue is a clear sign of low entropy. Therefore, to avoid collapsing and increase coverage, we consider explicitly increasing the entropy. 
+
+Although the idea sounds simple and straightforward, there are two practical challenges. 
+Firstly, as implicit generative models, GANs only provide samples rather than an analytic density form. As a result, we cannot evaluate the entropy exactly, which rules out the possibility of naive optimization.
+More problematically, the entropy is defined in a high-dimensional feature space, which is changing dynamically throughout the training process. 
+Consequently, it is difficult to estimate and optimize the generator entropy in the feature space in a stable and reliable way.
+Faced with these difficulties, we consider two practical solutions.
+
+The first method is inspired by the fact that input space is essentially static, where estimating and optimizing the counterpart quantities would be much more feasible.
+Hence, we instead increase the generator entropy in the \textit{input space}, i.e., $\mathcal{H}(p_G(x))$, using a technique derived from an information theoretical perspective and relies on variational inference (VI). 
+Specially, let $\mathcal{Z}$ be the latent variable space, and $\mathcal{X}$ be the input space. 
+We introduce an additional encoder, $q: \mathcal{X} \mapsto \mathcal{Z}$, to define a variational upper bound of the negative entropy~\citep{dai2017calibrating},
+$-\mathcal{H}(p_G(x)) \leq - \mathbb{E}_{x, z \sim p_G} \log q(z | x) = L_\text{VI}$.
+Hence, minimizing the upper bound $L_\text{VI}$ effectively increases the generator entropy.
+In our implementation, we formulate $q$ as a diagonal Gaussian with bounded variance, i.e.
+$q(z | x) = \mathcal{N}(\mu(x), \sigma^2(x)), \text{~with~} 0 < \sigma(x) < \theta$,
+where $\mu(\cdot)$ and $\sigma(\cdot)$ are neural networks, and $\theta$ is the threshold to prevent arbitrarily large variance.
+
+Alternatively, the second method aims at increasing the generator entropy in the feature space by optimizing an auxiliary objective. Concretely, we adapt the pull-away term (PT) \citep{zhao2016energy} as the auxiliary cost,
+$L_\text{PT} = \frac{1}{N(N-1)} \sum_{i=1}^{N} \sum_{j \neq i} \Big(\frac{f(x_i)^\top f(x_j)}{ \| f(x_i) \| \| f(x_j) \| }\Big)^2$,
+where $N$ is the size of a mini-batch and $x$ are samples.
+Intuitively, the pull-away term tries to orthogonalize the features in each mini-batch by minimizing the squared cosine similarity. Hence, it has the effect of increasing the diversity of generated features and thus the generator entropy.
+%If we examine the first two drawbacks more carefully, they fundamentally relate to the distribution of generated features, $p_G(f)$, and the distribution of real features, $p(f)$. 
+%Specifically, the collapsing problem (first drawback) basically indicates that $p_G(f)$ has a low entropy, and the second drawback suggests that $p_G(f)$ can have a significant overlapping with $p(f)$, which can be characterized by a high cross entropy $\mathbb{E}_{f \sim p_G(f)} \log p(f)$. Ideally, being able to estimate the two distributions will largely solve the problem.
+%
+%However, while the knowledge of these two feature distributions is crucial, the entire feature space is changing dynamically during training. Consequently, neither the generator entropy nor the cross entropy could be estimated and optimized in a stable and reliable way. 
+%Faced with this difficulty, as an approximation, we resort to estimating and optimizing the counterpart quantities in the input space. 
+%Concretely, to combat the first drawback, we will consider increasing the entropy of generated samples, $\mathcal{H}(p_G(x))$. For the second drawback, the input space cross entropy $\mathbb{E}_{x \sim p_G} \log p(x)$ is instead adopted. 
+%With the approximation, we then detail our proposed approach in the sequel.
+
+%If we examine the first two drawbacks more carefully, they fundamentally relate to the distribution of generated features and the distribution of real features. Hence, if we are able to estimate the two distributions, the problem can be largely solved.
+%However, while the knowledge of these two feature distributions is crucial, the entire feature space is changing dynamically during training. Consequently, it is difficult to estimate the distributions in a stable and reliable way, not to mention further utilizing them to solve the drawbacks. 
+%Faced with this difficulty, as an approximation, we resort to estimating and optimizing the counterpart quantities in the input space. 
+%With the approximation, we then detail our proposed approach in the sequel.
+
+\subsection{Generating Low-Density Samples}
+
+The second drawback of feature matching GANs is that high-density samples can be generated in the feature space, which is not desirable according to our analysis. Similar to the argument in Section \ref{sec:gen-ent}, it is infeasible to directly minimize the density of generated features. Instead, we enforce the generation of samples with low density in the input space. Specifically, given a threshold $\epsilon$, we minimize the following term as part of our objective:
+\begin{equation} \label{eq:ce}
+\mathbb{E}_{x \sim p_G} \log p(x) \mathbb{I}[p(x) > \epsilon]
+\end{equation}
+where $\mathbb{I}[\cdot]$ is an indicator function. Using a threshold $\epsilon$, we ensure that only high-density samples are penalized while low-density samples are unaffected. Intuitively, this objective pushes the generated samples to ``move'' towards low-density regions defined by $p(x)$.
+% \textbf{Density Estimation}
+To model the probability distribution over images, we simply adapt the state-of-the-art density estimation model for natural images, namely the PixelCNN++~\citep{salimans2017pixelcnn} model. The PixelCNN++ model is used to estimate the density $p(x)$ in Eq. (\ref{eq:ce}). The model is pretrained on the training set, and fixed during semi-supervised training.
+%
+%\subsection{Minimizing KL Divergence}
+%
+%Following prior work \citep{salimans2016improved,goodfellow2014generative}, we employ a GAN-like implicit generator. We first sample a latent variable $z$ from a uniform distribution $\mathcal{U}(0, 1)$ for each dimension, and then apply a deep convolutional network to transform $z$ to a sample $x$.
+%As discussed in Section \ref{sec:theory}, the complement generator is a preferred choice.
+%% Thus, a natural idea is to explicitly enforce the learned generator to resemble the complement generator.
+%Let $p^*$ denote the target distribution of a complement generator. 
+%We can achieve the goal by minimizing the KL divergence between the generator distribution and the target distribution, $\text{KL}(p_G \| p^*)$. 
+%Although the idea sounds straightforward, how to define $p^*$ is practically challenging. 
+%% By the definition of complement generator, the support of $p_G$ is the bounded complement of feature support in the feature space, i.e., $F_\mathcal{G} = \mathcal{B} - \cup F_k$. 
+%By definition we have $F_G = \mathcal{B} - \cup_k F_k$.
+%However, the entire feature space and the bound $\mathcal{B}$ are changing dynamically during training, and it is thus difficult to obtain a stable density estimation.
+%For this reason, as an approximation, we instead define the complement distribution and perform the KL minimization in the input space.
+%With a little abuse of notation, we define the target distribution $p^*(x)$ as follows
+%\begin{equation}
+%p^*(x) = 
+%\begin{cases}
+%\frac{1}{Z} \frac{1}{p(x)} & \text{if } p(x) > \epsilon \text{ and } x \in \mathcal{B}_x \\
+%C & \text{if } p(x) \leq \epsilon \text{ and } x \in \mathcal{B}_x,
+%\end{cases}
+%\label{eq:pstar}
+%\end{equation}
+%where $p(x)$ denotes the true data distribution, $\epsilon$ is a threshold for distinguishing high and low density samples, $Z$ is a normalizer, and $C$ is a constant. 
+%Note the $p^*(x)$ is only defined on a bounded area $\mathcal{B}_x$, resembling the bound we introduce in the definition of complement generator. 
+%In the high-density area, $p^*$ is a monotonically decreasing function of $p$, which corresponds to the motivation that we aim to generate low-density complement samples. 
+%In the low-density area, $p^*$ is no more penalized and we simply define it as a uniform distribution.
+%
+%Based on the definition, the corresponding KL divergence can then be written as
+%\begin{equation*}
+%\text{KL}(p_G \| p^*) = -\mathcal{H}(p_G) - \mathbb{E}_{x \sim p_G} \log p^*(x) = -\mathcal{H}(p_G) + \mathbb{E}_{x \sim p_G} \log p(x) \mathbb{I}[p(x) > \epsilon],
+%\end{equation*}
+%where $\mathcal{H}(\cdot)$ stands for the entropy, $\mathbb{I}[\cdot]$ is the indicator function, and we omit the constants.
+%We can interpret the above objective function in the following way.
+%%\begin{itemize}
+%The first term discourages the generator from collapsing by maximizing its entropy.
+%The second term discourages the generator from generating high-density samples.
+%%\end{itemize}
+%Thus minimizing the KL divergence addresses the first two drawbacks of feature matching.
+%
+%Since $p^*$ is only defined in $\mathcal{B}_x$, it is necessary to constrain the generator distribution $p_G$ on $\mathcal{B}_x$.
+%% For the objective function of the generator, it is practically intractable to define the bound $\mathcal{B}_x$ and constrain the generator distribution $p_G$ on $\mathcal{B}_x$.
+%As a practical solution, we add the original feature matching term to our objective function to encourage the generated samples to be ``close'' to the true data (see Section \ref{sec:case_study}). 
+%Hence, the overall objective function for the generator is as follows
+%\begin{equation}
+%\label{eq:g_full}
+%\min_G \quad -\mathcal{H}(p_G) + \mathbb{E}_{x \sim p_G} \log p(x) \mathbb{I}[p(x) > \epsilon]  + \|\mathbb{E}_{x \sim p_G} f(x) - \mathbb{E}_{x \sim \mathcal{U}} f(x)\|^2.
+%\end{equation}
+%To optimize Eq. (\ref{eq:g_full}), we need to address two technical challenges --- first, how to compute the entropy $\mathcal{H}(p_G)$, and second, how to obtain a density estimation $p(x)$.
+%
+%\subsubsection{Approximate Entropy Maximization} \label{sec:entropy}
+%In general, estimating the entropy of implicit distribution from samples remains an open problem. 
+%Thus, we consider two approximate methods for maximizing the entropy of $p_G$. 
+%
+%The first method is derived from an information theoretical perspective and relies on variational inference (VI). 
+%% Instead of directly minimizing $-\mathcal{H}(p_G)$ in Eq. \eqref{eq:g_full},
+%Let $\mathcal{Z}$ be the latent variable space.
+%We introduce an additional encoder $q: \mathcal{B}_x \mapsto \mathcal{Z}$ to define a variational upper bound~\citep{dai2017calibrating},
+%$-\mathcal{H}(p_G) \leq - \mathbb{E}_{x, z \sim p_G} \log q(z | x) = L_\text{VI}$,
+%and minimize the upper bound $L_\text{VI}$ in our objective.
+%In our implementation, we formulate $q$ as a diagonal Gaussian with bounded variance, i.e.
+%$q(z | x) = \mathcal{N}(\mu(x), \sigma^2(x)), \text{~with~} 0 < \sigma(x) < \theta$,
+%where $\mu(\cdot)$ and $\sigma(\cdot)$ are neural networks, and $\theta$ is the threshold to prevent arbitrarily large variance.
+%
+%The second method aims at increasing the entropy of generated features directly in the feature space. Specifically, we adapt the pull-away term (PT) proposed by \citep{zhao2016energy},
+%$L_\text{PT} = \frac{1}{N(N-1)} \sum_{i=1}^{N} \sum_{j \neq i} \bigg(\frac{f(x_i)^\top f(x_j)}{ \| f(x_i) \| \| f(x_j) \| }\bigg)^2$,
+%where $N$ is the size of a mini-batch and $x$ are samples.
+%Intuitively, the pull-away term has the effect of increasing the entropy of the generated features since it tries to orthogonalize the features in each mini-batch by minimizing the squared cosine similarity. 
+
+\subsection{Generator Objective and Interpretation}
+Combining our solutions to the first two drawbacks of feature matching GANs, we have the following objective function of the generator:
+\begin{equation}
+%\small
+\label{eq:g_full}
+\min_G \quad -\mathcal{H}(p_G) + \mathbb{E}_{x \sim p_G} \log p(x) \mathbb{I}[p(x) > \epsilon]  + \|\mathbb{E}_{x \sim p_G} f(x) - \mathbb{E}_{x \sim \mathcal{U}} f(x)\|^2.
+\end{equation}
+This objective is closely related to the idea of complement generator discussed in Section \ref{sec:theory}.
+To see that, let's first define a target complement distribution in the input space as follows
+\begin{equation*}
+%\small
+p^*(x) = 
+\begin{cases}
+\frac{1}{Z} \frac{1}{p(x)} & \text{if } p(x) > \epsilon \text{ and } x \in \mathcal{B}_x \\
+C & \text{if } p(x) \leq \epsilon \text{ and } x \in \mathcal{B}_x,
+\end{cases}
+\end{equation*}
+where $Z$ is a normalizer, $C$ is a constant, and $\mathcal{B}_x$ is the set defined by mapping $\mathcal{B}$ from the feature space to the input space. 
+%By adjusting $C$, we can make sure $p^*(x)$ puts most of its probability mass in the complement space, and is a monotonically decreasing function of $p$ on manifold.
+With the definition, the KL divergence (KLD) between $p_G(x)$ and $p^*(x)$ is
+\begin{equation*}
+%\small
+\text{KL}(p_G \| p^*) = -\mathcal{H}(p_G) + \mathbb{E}_{x \sim p_G} \log p(x) \mathbb{I}[p(x) > \epsilon] + \mathbb{E}_{x \sim p_G} \big( \mathbb{I}[p(x) > \epsilon] \log Z - \mathbb{I}[p(x) \leq \epsilon] \log C \big).
+\end{equation*}
+The form of the KLD immediately reveals the aforementioned connection. 
+Firstly, the KLD shares two exactly the same terms with the generator objective \eqref{eq:g_full}. 
+Secondly, while $p^*(x)$ is only defined in $\mathcal{B}_x$, there is not such a hard constraint on $p_G(x)$. 
+However, the feature matching term in Eq. \eqref{eq:g_full} can be seen as softly enforcing this constraint by bringing generated samples ``close'' to the true data (Cf. Section \ref{sec:case_study}). 
+%Moreover, note that the last term in KLD can be written as $\mathbb{E}_{z \sim p(z)} \big( \mathbb{I}[p(G(z)) > \epsilon] \log Z - \mathbb{I}[p(G(z)) \leq \epsilon] \log C \big)$ under implicit generative models. Because the identity function $\mathbb{I}[\cdot]$ has zero gradient almost everywhere, this term would not contribute any informative gradient to the generator. 
+Moreover, because the identity function $\mathbb{I}[\cdot]$ has zero gradient almost everywhere, the last term in KLD would not contribute any informative gradient to the generator. 
+In summary, optimizing our proposed objective \eqref{eq:g_full} can be understood as minimizing the KL divergence between the generator distribution and a desired complement distribution, which connects our practical solution to our theoretical analysis. 
+
+%\subsection{Minimizing KL Divergence}
+%
+%Following prior work \citep{salimans2016improved,goodfellow2014generative}, we employ a GAN-like implicit generator. We first sample a latent variable $z$ from a uniform distribution $\mathcal{U}(0, 1)$ for each dimension, and then apply a deep convolutional network to transform $z$ to a sample $x$.
+%As discussed in Section \ref{sec:theory}, the complement generator is a preferred choice.
+%% Thus, a natural idea is to explicitly enforce the learned generator to resemble the complement generator.
+%Let $p^*$ denote the target distribution of a complement generator. 
+%We can achieve the goal by minimizing the KL divergence between the generator distribution and the target distribution, $\text{KL}(p_G \| p^*)$. 
+%Although the idea sounds straightforward, how to define $p^*$ is practically challenging. 
+%% By the definition of complement generator, the support of $p_G$ is the bounded complement of feature support in the feature space, i.e., $F_\mathcal{G} = \mathcal{B} - \cup F_k$. 
+%By definition we have $F_G = \mathcal{B} - \cup_k F_k$.
+%However, the entire feature space and the bound $\mathcal{B}$ are changing dynamically during training, and it is thus difficult to obtain a stable density estimation.
+%For this reason, as an approximation, we instead define the complement distribution and perform the KL minimization in the input space.
+%With a little abuse of notation, we define the target distribution $p^*(x)$ as follows
+%\begin{equation}
+%p^*(x) = 
+%\begin{cases}
+%\frac{1}{Z} \frac{1}{p(x)} & \text{if } p(x) > \epsilon \text{ and } x \in \mathcal{B}_x \\
+%C & \text{if } p(x) \leq \epsilon \text{ and } x \in \mathcal{B}_x,
+%\end{cases}
+%\label{eq:pstar}
+%\end{equation}
+%where $p(x)$ denotes the true data distribution, $\epsilon$ is a threshold for distinguishing high and low density samples, $Z$ is a normalizer, and $C$ is a constant. 
+%Note the $p^*(x)$ is only defined on a bounded area $\mathcal{B}_x$, resembling the bound we introduce in the definition of complement generator. 
+%In the high-density area, $p^*$ is a monotonically decreasing function of $p$, which corresponds to the motivation that we aim to generate low-density complement samples. 
+%In the low-density area, $p^*$ is no more penalized and we simply define it as a uniform distribution.
+%
+%Based on the definition, the corresponding KL divergence can then be written as
+%\begin{equation*}
+%\text{KL}(p_G \| p^*) = -\mathcal{H}(p_G) - \mathbb{E}_{x \sim p_G} \log p^*(x) = -\mathcal{H}(p_G) + \mathbb{E}_{x \sim p_G} \log p(x) \mathbb{I}[p(x) > \epsilon],
+%\end{equation*}
+%where $\mathcal{H}(\cdot)$ stands for the entropy, $\mathbb{I}[\cdot]$ is the indicator function, and we omit the constants.
+%We can interpret the above objective function in the following way.
+%%\begin{itemize}
+%The first term discourages the generator from collapsing by maximizing its entropy.
+%The second term discourages the generator from generating high-density samples.
+%%\end{itemize}
+%Thus minimizing the KL divergence addresses the first two drawbacks of feature matching.
+%
+%Since $p^*$ is only defined in $\mathcal{B}_x$, it is necessary to constrain the generator distribution $p_G$ on $\mathcal{B}_x$.
+%% For the objective function of the generator, it is practically intractable to define the bound $\mathcal{B}_x$ and constrain the generator distribution $p_G$ on $\mathcal{B}_x$.
+%As a practical solution, we add the original feature matching term to our objective function to encourage the generated samples to be ``close'' to the true data (see Section \ref{sec:case_study}). 
+%Hence, the overall objective function for the generator is as follows
+%\begin{equation}
+%\label{eq:g_full}
+%\min_G \quad -\mathcal{H}(p_G) + \mathbb{E}_{x \sim p_G} \log p(x) \mathbb{I}[p(x) > \epsilon]  + \|\mathbb{E}_{x \sim p_G} f(x) - \mathbb{E}_{x \sim \mathcal{U}} f(x)\|^2.
+%\end{equation}
+%To optimize Eq. (\ref{eq:g_full}), we need to address two technical challenges --- first, how to compute the entropy $\mathcal{H}(p_G)$, and second, how to obtain a density estimation $p(x)$.
+%
+%\subsubsection{Approximate Entropy Maximization} \label{sec:entropy}
+%In general, estimating the entropy of implicit distribution from samples remains an open problem. 
+%Thus, we consider two approximate methods for maximizing the entropy of $p_G$. 
+%
+%The first method is derived from an information theoretical perspective and relies on variational inference (VI). 
+%% Instead of directly minimizing $-\mathcal{H}(p_G)$ in Eq. \eqref{eq:g_full},
+%Let $\mathcal{Z}$ be the latent variable space.
+%We introduce an additional encoder $q: \mathcal{B}_x \mapsto \mathcal{Z}$ to define a variational upper bound~\citep{dai2017calibrating},
+%$-\mathcal{H}(p_G) \leq - \mathbb{E}_{x, z \sim p_G} \log q(z | x) = L_\text{VI}$,
+%and minimize the upper bound $L_\text{VI}$ in our objective.
+%In our implementation, we formulate $q$ as a diagonal Gaussian with bounded variance, i.e.
+%$q(z | x) = \mathcal{N}(\mu(x), \sigma^2(x)), \text{~with~} 0 < \sigma(x) < \theta$,
+%where $\mu(\cdot)$ and $\sigma(\cdot)$ are neural networks, and $\theta$ is the threshold to prevent arbitrarily large variance.
+%
+%The second method aims at increasing the entropy of generated features directly in the feature space. Specifically, we adapt the pull-away term (PT) proposed by \citep{zhao2016energy},
+%$L_\text{PT} = \frac{1}{N(N-1)} \sum_{i=1}^{N} \sum_{j \neq i} \bigg(\frac{f(x_i)^\top f(x_j)}{ \| f(x_i) \| \| f(x_j) \| }\bigg)^2$,
+%where $N$ is the size of a mini-batch and $x$ are samples.
+%Intuitively, the pull-away term has the effect of increasing the entropy of the generated features since it tries to orthogonalize the features in each mini-batch by minimizing the squared cosine similarity. 
+
+% Since we have to use the PixelCNN to provide density estimation for different generated samples consistently during training, we have deliberately reduced the size of PixelCNN to make the experiment speed and GPU memory usage acceptable.
+
+\subsection{Conditional Entropy}
+
+In order for the complement generator to work, according to condition (3) in Assumption \ref{assum:opt}, the discriminator needs to have strong true-fake belief on unlabeled data, i.e., $\max_{k=1}^K w_k^\top f(x) > 0$. 
+However, the objective function of the discriminator in \citep{salimans2016improved} does not enforce a dominant class. Instead, it only needs $\sum_{k=1}^K P_D(k|x) > P_D(K+1 | x)$ to obtain a correct decision boundary, while the probabilities $P_D(k | x)$ for $k \leq K$ can possibly be uniformly distributed. To guarantee the strong true-fake belief in the optimal conditions, we add a conditional entropy term to the discriminator objective and it becomes,
+\begin{equation}
+\small
+\begin{aligned}
+\max_{D} \quad
+& \mathbb{E}_{x, y \sim \mathcal{L}} \log p_D(y | x, y \leq K) + \mathbb{E}_{x \sim \mathcal{U}} \log p_D(y \leq K | x) + \\
+& \mathbb{E}_{x \sim p_G} \log p_D(K + 1 | x)  + \mathbb{E}_{x \sim \mathcal{U}} \sum_{k = 1}^K p_D(k | x) \log p_D(k | x).
+\label{eq:d_full}
+\end{aligned}
+\end{equation}
+% \begin{equation}
+% \min_D \quad \mathcal{H}(p_D(y \mid x, y \leq K)) = \mathbb{E}_{x \sim p} \left[ \sum_{k = 1}^K - p_D(k | x) \log p_D(k | x) \right].
+% \label{eq:d2}
+% \end{equation}
+By optimizing Eq. (\ref{eq:d_full}), the discriminator is encouraged to satisfy condition (3) in Assumption \ref{assum:opt}.
+Note that the same conditional entropy term has been used in other semi-supervised learning methods \citep{springenberg2015unsupervised,miyato2017virtual} as well, but here we motivate the minimization of conditional entropy based on our theoretical analysis of GAN-based semi-supervised learning.
+
+To train the networks, we alternatively update the generator and the discriminator to optimize Eq. (\ref{eq:g_full}) and Eq. (\ref{eq:d_full}) based on mini-batches. If an encoder is used to maximize $\mathcal{H}(p_G)$, the encoder and the generator are updated at the same time.
+
+
+% \subsection{Overall Algorithm}
+% So far we have addressed all of the three drawbacks of the original feature matching algorithms based on our analysis. The overall objective function for the discriminator can be written as follows
+% \begin{equation}
+% \begin{aligned}
+% \max_{D} \quad
+% & \mathbb{E}_{x, y \sim \mathcal{L}} \log p_D(y | x, y \leq K) + \mathbb{E}_{x \sim \mathcal{U}} \log p_D(y \leq K | x) \nonumber + \\
+% & \mathbb{E}_{x \sim p_G} \log p_D(K + 1 | x)  + \mathbb{E}_{x \sim \mathcal{U}} \sum_{k = 1}^K p_D(k | x) \log p_D(k | x).
+% \end{aligned}
+% \label{eq:d_full}
+% \end{equation}
+
+% Before we come to the point whether we can use SGD to optimize the above objective functions, we need to address two more technical challenges --- First, how to compute the entropy $\mathcal{H}(p_G)$, and second, how to obtain a density estimation $p(x)$.
+
+
+
+%the method from \citep{oord2016pixel} that tractably computes the likelihood of images. 
+%The image distribution is modeled as a joint distribution over pixels.
+%The joint distribution can be factorized into a production of conditional distributions. 
+%Each conditional distribution is the probability of a pixel conditioning on previously scanned pixel values. 
+%A neural network scans the image pixels one row at a time and from left to right within each row. 
+%This modeling process results in the following probability parameterization:
+%\begin{align}
+%p(x) = \prod_{i=1}^{n^2} p(x_i | x_1,...,x_{i-1})
+%\end{align}
+%where $x$ is an $n$ by $n$ image. 
+%The value $p(x_i | x_1,...,x_{i-1})$ is the probability of the $i$-th pixel $x_i$ given all the previous pixels $x_1,...,x_{i-1}$.
+%Each pixel $x_i$ is jointly determined by three values, one for each of the color channels Red, Green and Blue (RGB). 
+%The distribution $p(x_i|x_{<i})$ can be rewritten as the following product:
+%\begin{align}
+%p(x_{i,R}|x_{<i})p(x_{i,G}|x_{<i},x_{i,R})p(x_{i,B}|x_{<i},x_{i,R},x_{i,G})
+%\end{align} 
+%Each of the colors is thus conditioned on the other channels as well as on all the previously generated pixels. 
+%The neural network that scans the image can be a recurrent neural network, such as LSTM. 
+%The advantage of using recurrent network is that the pixels dependency can be unbounded. 
+%However, this increases the computation cost as states need to computed sequentially. 
+%A work-around is to use convolution neural network, named PixelCNN, where the convolution layers are used as masks to capture a bounded receptive field.
+%Multiple convolution layers that preserve the spatial resolution are used. 
+%Pooling	layers are not used. 
+%Masks are adopted in the convolutions to avoid seeing future pixels.
